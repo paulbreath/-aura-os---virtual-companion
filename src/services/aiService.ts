@@ -327,8 +327,9 @@ const callDeepSeek = async (systemInstruction: string, messages: any[], temperat
 };
 
 const callDeepSeekJson = async (systemInstruction: string, prompt: string, modelId: string = 'deepseek-chat') => {
-  const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
-  if (!apiKey) {
+  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+  if (!apiKey || apiKey === 'sk-your-deepseek-key') {
+    console.warn("DeepSeek API key not set or using default value");
     return null;
   }
   
@@ -358,9 +359,9 @@ const callDeepSeekJson = async (systemInstruction: string, prompt: string, model
 };
 
 const callStep = async (systemInstruction: string, messages: any[], temperature: number, modelId: string = 'step-3-5-flash') => {
-  const apiKey = (import.meta as any).env.VITE_STEP_API_KEY;
-  if (!apiKey) {
-    console.warn("StepFun API key is missing. Skipping Step provider.");
+  const apiKey = import.meta.env.VITE_STEP_API_KEY;
+  if (!apiKey || apiKey === 'sk-your-step-key') {
+    console.warn("StepFun API key not set or using default value");
     return null;
   }
   
@@ -395,8 +396,9 @@ const callStep = async (systemInstruction: string, messages: any[], temperature:
 };
 
 const callStepJson = async (systemInstruction: string, prompt: string, modelId: string = 'step-3-5-flash') => {
-  const apiKey = (import.meta as any).env.VITE_STEP_API_KEY;
-  if (!apiKey) {
+  const apiKey = import.meta.env.VITE_STEP_API_KEY;
+  if (!apiKey || apiKey === 'sk-your-step-key') {
+    console.warn("StepFun API key not set or using default value");
     return null;
   }
   
@@ -426,9 +428,9 @@ const callStepJson = async (systemInstruction: string, prompt: string, modelId: 
 };
 
 const callOpenRouter = async (systemInstruction: string, messages: any[], temperature: number, modelId: string = 'openrouter/dolphin-mistral-24b-venice-edition:free') => {
-  const apiKey = (import.meta as any).env.VITE_OPENROUTER_API_KEY;
-  if (!apiKey) {
-    console.warn("OpenRouter API key is missing. Skipping OpenRouter provider.");
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey || apiKey === 'sk-or-your-openrouter-key') {
+    console.warn("OpenRouter API key not set or using default value");
     return null;
   }
   
@@ -465,8 +467,9 @@ const callOpenRouter = async (systemInstruction: string, messages: any[], temper
 };
 
 const callOpenRouterJson = async (systemInstruction: string, prompt: string, modelId: string = 'openrouter/dolphin-mistral-24b-venice-edition:free') => {
-  const apiKey = (import.meta as any).env.VITE_OPENROUTER_API_KEY;
-  if (!apiKey) {
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey || apiKey === 'sk-or-your-openrouter-key') {
+    console.warn("OpenRouter API key not set or using default value");
     return null;
   }
   
@@ -1172,15 +1175,13 @@ export const generateSelfie = async (
   // Build enhanced prompt with simple, safe descriptions
   let enhancedPrompt = avatar.imagePrompt;
   
-  // Incorporate user's specific request if provided
   if (userRequest) {
     enhancedPrompt += ` ${userRequest}.`;
   }
-   
-   // Simple style description
-   enhancedPrompt += ` High quality portrait photo, natural lighting, looking at camera.`;
+  
+  enhancedPrompt += ` High quality portrait photo, natural lighting, looking at camera.`;
 
-  // Add visual traits to ensure consistency across generations
+  // Add visual traits to ensure consistency
   if (avatar.visualTraits) {
     const traits = [];
     if (avatar.visualTraits.hair) traits.push(avatar.visualTraits.hair);
@@ -1193,12 +1194,11 @@ export const generateSelfie = async (
     }
   }
   
-  // Add seed-based consistency hint
   enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance with previous images.`;
   
   const finalPrompt = `${enhancedPrompt} Recent context: ${context}`;
 
-  // Try server proxy first (avoids CORS)
+  // Primary: Server proxy (avoids CORS, uses configured APIs)
   try {
     const proxyRes = await fetch('/api/generate-image', {
       method: 'POST',
@@ -1207,53 +1207,19 @@ export const generateSelfie = async (
     });
     if (proxyRes.ok) {
       const data = await proxyRes.json();
-      if (data.image) {
-        console.log('Image generated via server proxy');
-        return data.image;
-      }
-    } else {
-      console.warn('Server proxy returned:', proxyRes.status);
+      if (data.image) return data.image;
     }
   } catch (error) {
-    console.warn("Server proxy failed, falling back to direct APIs:", error);
+    console.warn("Server proxy failed, will try fallbacks:", error);
   }
 
-  // Direct API calls (will likely fail due to CORS)
-  // Try Grok Imagine first (X.AI's native image generation)
-  try {
-    const grokImage = await callGrokImagine(finalPrompt);
-    if (grokImage) {
-      return grokImage;
-    }
-  } catch (error) {
-    console.warn("Grok Imagine failed, falling back to FAL.AI:", error);
-  }
-
-  // Try FAL.AI second
-  try {
-    const falImage = await callFalImage(finalPrompt);
-    if (falImage) {
-      return falImage;
-    }
-  } catch (error) {
-    console.warn("FAL.AI failed, falling back to Stability AI:", error);
-  }
-
-  // Try Stability AI third
-  try {
-    const stabilityImage = await callStabilityAI(finalPrompt);
-    if (stabilityImage) {
-      return stabilityImage;
-    }
-  } catch (error) {
-    console.warn("Stability AI failed, falling back to Pollinations.ai:", error);
-  }
-
-  // Try Pollinations.ai (free, no API key, no CORS issues)
+  // Fallback 1: Pollinations.ai (no CORS, no API key)
   try {
     const seed = Date.now();
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
-    const response = await fetch(pollinationsUrl, { cache: 'no-store' });
+    const response = await fetch(pollinationsUrl, { 
+      cache: 'no-store' 
+    });
     if (response.ok) {
       const blob = await response.blob();
       const buffer = await blob.arrayBuffer();
@@ -1261,49 +1227,33 @@ export const generateSelfie = async (
         new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
       return `data:image/png;base64,${base64}`;
-    } else {
-      console.warn(`Pollinations.ai failed: ${response.status}`);
     }
   } catch (error) {
-    console.warn("Pollinations.ai failed, falling back to Gemini:", error);
+    console.warn("Pollinations.ai failed:", error);
   }
 
-  // Fallback to Gemini - only if Gemini is configured and we have an image-capable model
-  if (!ai) {
-    console.error("No image generation API configured (Gemini, Stability AI, FAL.AI, or Pollinations.ai)");
-    return null;
-  }
+  // Fallback 2: Gemini image generation
+  if (ai) {
+    try {
+      const imageModel = 'gemini-2.0-flash-exp';
+      const response = await withRetry(() => ai.models.generateContent({
+        model: imageModel,
+        contents: [{ parts: [{ text: finalPrompt }] }],
+        config: { responseModalities: ['IMAGE'] }
+      }));
 
-  try {
-    // Use a model that supports image generation
-    const imageModel = 'gemini-2.0-flash-exp'; // Supports image generation
-    const response = await withRetry(() => ai.models.generateContent({
-      model: imageModel,
-      contents: [
-        {
-          parts: [
-            { text: finalPrompt }
-          ]
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
-      ],
-      config: {
-        responseModalities: ['IMAGE']
       }
-    }));
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
+    } catch (error) {
+      console.error("Gemini image generation failed:", error);
     }
-    return null;
-  } catch (error: any) {
-    console.error("Error generating selfie:", error);
-    if (error?.message?.includes('image input') || error?.message?.includes('does not support image')) {
-      console.error("The configured Gemini model does not support image generation.");
-    }
-    return null;
   }
+
+  console.error("All image generation methods failed");
+  return null;
 };
 
 export const generateSpeech = async (
