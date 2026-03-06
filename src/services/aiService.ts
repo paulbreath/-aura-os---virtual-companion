@@ -1198,6 +1198,21 @@ export const generateSelfie = async (
   
   const finalPrompt = `${enhancedPrompt} Recent context: ${context}`;
 
+  // Try server proxy first (avoids CORS)
+  try {
+    const proxyRes = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: finalPrompt }),
+    });
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data.image) return data.image;
+    }
+  } catch (error) {
+    console.warn("Server proxy failed, falling back to direct APIs:", error);
+  }
+
   // Try Grok Imagine first (X.AI's native image generation)
   try {
     const grokImage = await callGrokImagine(finalPrompt);
