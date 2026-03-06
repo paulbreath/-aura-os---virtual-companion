@@ -9,6 +9,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
+// Simple health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 const fetchImageAsBase64 = async (url) => {
   const response = await fetch(url);
   const buffer = await response.arrayBuffer();
@@ -16,6 +21,9 @@ const fetchImageAsBase64 = async (url) => {
 };
 
 app.post('/api/generate-image', async (req, res) => {
+  console.log('=== /api/generate-image called ===');
+  console.log('Body:', req.body);
+  
   const { prompt } = req.body;
   
   if (!prompt) {
