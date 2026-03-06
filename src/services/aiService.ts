@@ -1207,12 +1207,18 @@ export const generateSelfie = async (
     });
     if (proxyRes.ok) {
       const data = await proxyRes.json();
-      if (data.image) return data.image;
+      if (data.image) {
+        console.log('Image generated via server proxy');
+        return data.image;
+      }
+    } else {
+      console.warn('Server proxy returned:', proxyRes.status);
     }
   } catch (error) {
     console.warn("Server proxy failed, falling back to direct APIs:", error);
   }
 
+  // Direct API calls (will likely fail due to CORS)
   // Try Grok Imagine first (X.AI's native image generation)
   try {
     const grokImage = await callGrokImagine(finalPrompt);
