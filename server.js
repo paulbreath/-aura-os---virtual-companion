@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 3000;
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 60_000, // 1 minute
-  max: 30, // limit each IP to 30 requests per windowMs
+  windowMs: 60_000,
+  max: 30,
   message: 'Too many requests from this IP, please try again later.'
 });
 
@@ -30,7 +30,6 @@ const ALLOWED_IMAGE_DOMAINS = new Set([
   'queue.fal.run',
   'image.pollinations.ai',
   'v3b.fal.media',
-  // Add other trusted domains as needed
 ]);
 
 const isAllowedUrl = (url) => {
@@ -54,7 +53,6 @@ const fetchImageAsBase64 = async (url) => {
   return buffer.toString('base64');
 };
 
-// Health check (minimal info)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -70,11 +68,12 @@ app.post('/api/generate-image', async (req, res) => {
     return res.status(400).json({ error: 'Prompt too long (max 1000 characters)' });
   }
 
-  // Server-side API keys (non-VITE prefixed)
   const xaiKey = process.env.XAI_API_KEY;
   const falKey = process.env.FAL_API_KEY;
 
   console.log(`[${new Date().toISOString()}] Generating image, prompt length: ${prompt.length}`);
+  console.log(`X.AI key available: ${!!xaiKey}`);
+  console.log(`FAL.AI key available: ${!!falKey}`);
 
   try {
     // Try X.AI Grok Imagine first
@@ -96,12 +95,20 @@ app.post('/api/generate-image', async (req, res) => {
           }),
         });
 
+        console.log('X.AI response status:', xaiRes.status);
+
         if (xaiRes.ok) {
           const data = await xaiRes.json();
+          console.log('X.AI response data:', JSON.stringify(data).substring(0, 200));
           if (data.data && data.data[0]?.url && isAllowedUrl(data.data[0].url)) {
             const base64 = await fetchImageAsBase64(data.data[0].url);
             return res.json({ image: `data:image/png;base64,${base64}` });
+          } else {
+            console.log('X.AI response missing data or url:', data);
           }
+        } else {
+          const errorText = await xaiRes.text();
+          console.log('X.AI error:', errorText);
         }
       } catch (e) {
         console.log('X.AI request failed:', e.message);
@@ -125,6 +132,8 @@ app.post('/api/generate-image', async (req, res) => {
           }),
         });
 
+        console.log('FAL response status:', falRes.status);
+
         if (falRes.ok) {
           const data = await falRes.json();
           console.log('FAL response:', JSON.stringify(data).substring(0, 200));
@@ -135,15 +144,15 @@ app.post('/api/generate-image', async (req, res) => {
           }
           
           if (data.request_id) {
-            // Poll for result with overall timeout
             const startTime = Date.now();
-            const timeout = 60000; // 60 seconds total
+            const timeout = 60000;
             while (Date.now() - startTime < timeout) {
               await new Promise(r => setTimeout(r, 2000));
               const statusRes = await fetch(`https://queue.fal.run/fal-ai/flux-dev/requests/${data.request_id}/status`, {
                 headers: { 'Authorization': `Bearer ${falKey}` },
               });
               const statusData = await statusRes.json();
+              console.log('FAL status:', statusData.status);
               
               if (statusData.status === 'COMPLETED') {
                 if (statusData.images?.[0]?.url) {
@@ -157,13 +166,15 @@ app.post('/api/generate-image', async (req, res) => {
               }
             }
           }
+        } else {
+          const errorText = await falRes.text();
+          console.log('FAL error:', errorText);
         }
       } catch (e) {
         console.log('FAL request failed:', e.message);
       }
     }
 
-    // If we get here, no API worked
     res.status(503).json({ 
       error: 'Image generation unavailable. Please try again later.' 
     });
@@ -174,7 +185,6 @@ app.post('/api/generate-image', async (req, res) => {
   }
 });
 
-// Serve static files
 const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
