@@ -175,7 +175,6 @@ app.post('/api/generate-image', async (req, res) => {
       }
     }
 
-    // Both failed
     res.status(503).json({ 
       error: 'Image generation unavailable. Please try again later.' 
     });
