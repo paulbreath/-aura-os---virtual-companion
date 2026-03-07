@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>X.AI Image Generation Test</title>
+</head>
+<body>
+  <h1>X.AI Grok Imagine Test</h1>
+  <textarea id="prompt" rows="3" cols="50" placeholder="Enter prompt">A selfie of a young woman with blonde hair, smiling, looking at camera, natural light, high quality photo</textarea>
+  <br>
+  <button onclick="generate()">Generate</button>
+  <div id="result"></div>
+
+  <script>
+    // Enter your X.AI API key below
+    const API_KEY = prompt('Enter X.AI API Key:', '') || '';
+
+    async function generate() {
+      const prompt = document.getElementById('prompt').value;
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = 'Loading...';
+
+      try {
+        const response = await fetch('https://api.x.ai/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'grok-imagine-image',
+            prompt: prompt,
+            n: 1,
+            size: '1024x1024',
+            response_format: 'url'
+          })
+        });
+
+        const data = await response.json();
+        resultDiv.innerHTML = JSON.stringify(data, null, 2);
+
+        if (data.data && data.data[0]?.url) {
+          const img = document.createElement('img');
+          img.src = data.data[0].url;
+          img.style.maxWidth = '512px';
+          resultDiv.appendChild(img);
+        }
+      } catch (error) {
+        resultDiv.innerHTML = 'Error: ' + error.message;
+      }
+    }
+  </script>
+</body>
+</html>
