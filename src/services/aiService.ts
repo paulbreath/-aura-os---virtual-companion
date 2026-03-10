@@ -1508,11 +1508,11 @@ export const generateSpeech = async (
       if (!apiKey) return null;
 
       const voiceMap: Record<string, string> = {
-        '9lHjugDhwqoxA5MhX0az': 'male-qn-qingse',  // Aura
-        'bhJUNIXWQQ94l8eI2VUf': 'male-qn-jingying', // Nova
-        'BqljjWyTnrioXPCNkCd4': 'female-shaonv',    // Serena
-        'APSIkVZudNbPAwyPoeVO': 'female-yujie',    // Atlas
-        'jqcCZkN6Knx8BJ5TBdYR': 'female-qn-qingse'  // Orion
+        '9lHjugDhwqoxA5MhX0az': 'female-shaonv',      // Aura - 少女
+        'bhJUNIXWQQ94l8eI2VUf': 'female-yujie',        // Nova - 御姐
+        'BqljjWyTnrioXPCNkCd4': 'female-qn-qingse',    // Serena - 青涩
+        'APSIkVZudNbPAwyPoeVO': 'female-baiyang',      // Atlas - 白杨
+        'jqcCZkN6Knx8BJ5TBdYR': 'female-yina'          // Orion - 伊娜
       };
 
       const voiceId = voiceMap[voiceName] || 'female-shaonv';
@@ -1566,23 +1566,17 @@ export const generateSpeech = async (
       if (azureResponse) return azureResponse;
     }
 
-    // Try ElevenLabs if key exists
-   if (import.meta.env.VITE_ELEVENLABS_API_KEY) {
-     const elResponse = await tryElevenLabs();
-     if (elResponse) return elResponse;
-   }
+    // Try browser TTS (always available)
+    const browserResult = await tryBrowserTTS();
+    if (browserResult) {
+      return browserResult;
+    }
 
-   // Try OpenAI TTS if key exists
-   if (import.meta.env.VITE_OPENAI_API_KEY) {
-     const openAIResponse = await tryOpenAITTS();
-     if (openAIResponse) return openAIResponse;
-   }
-
-   // Try browser TTS (always available)
-   const browserResult = await tryBrowserTTS();
-   if (browserResult) {
-     return browserResult;
-   }
+    // Try ElevenLabs as backup
+    if (import.meta.env.VITE_ELEVENLABS_API_KEY) {
+      const elResponse = await tryElevenLabs();
+      if (elResponse) return elResponse;
+    }
 
    // Last resort: Try Gemini TTS if configured (only if not in China and ai exists)
    if (!inChina && ai) {
