@@ -1555,7 +1555,7 @@ export const generateSpeech = async (
       const voiceId = voiceMap[voiceName] || 'female-shaonv';
 
       try {
-        const res = await fetch('https://api.minimaxi.chat/v1/t2a_v2', {
+        const res = await fetch('https://api.minimax.io/v1/t2a_v2', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -1568,7 +1568,7 @@ export const generateSpeech = async (
               voice_id: voiceId
             },
             audio_setting: {
-              sample_rate: 32000,
+              audio_sample_rate: 32000,
               bitrate: 128000,
               format: 'mp3'
             }
