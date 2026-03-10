@@ -59,6 +59,9 @@ export interface Avatar {
 }
 
 export const MINIMAX_TTS_VOICES = [
+  { id: 'ttv-voice-2026031023545326-M2Ysf3RQ', name: 'Aura', description: '甜美元气' },
+  { id: 'ttv-voice-2026031023575226-mn9RwOnZ', name: 'NOVA', description: '御姐成熟' },
+  { id: 'ttv-voice-2026031100011926-ouG12Sva', name: 'Serena', description: '温柔知性' },
   { id: 'female-shaonv', name: '少女', description: '甜美可爱' },
   { id: 'female-qn-qingse', name: '青涩', description: '清新自然' },
   { id: 'female-yujie', name: '御姐', description: '成熟性感' },
@@ -1526,7 +1529,11 @@ export const generateSpeech = async (
       console.log('🔊 MiniMax TTS: Trying with voiceId:', voiceName);
 
       const voiceMap: Record<string, string> = {
-        // New MiniMax voice IDs (directly pass through)
+        // User-created MiniMax voices
+        'ttv-voice-2026031023545326-M2Ysf3RQ': 'ttv-voice-2026031023545326-M2Ysf3RQ', // Aura
+        'ttv-voice-2026031023575226-mn9RwOnZ': 'ttv-voice-2026031023575226-mn9RwOnZ', // NOVA
+        'ttv-voice-2026031100011926-ouG12Sva': 'ttv-voice-2026031100011926-ouG12Sva', // Serena
+        // Preset MiniMax voice IDs (directly pass through)
         'female-shaonv': 'female-shaonv',
         'female-qn-qingse': 'female-qn-qingse',
         'female-yujie': 'female-yujie',
@@ -1538,9 +1545,9 @@ export const generateSpeech = async (
         'female-sitong': 'female-sitong',
         'female-douyin': 'female-douyin',
         // Legacy ElevenLabs voice IDs (map to MiniMax voices)
-        '9lHjugDhwqoxA5MhX0az': 'female-shaonv',
-        'bhJUNIXWQQ94l8eI2VUf': 'female-yujie',
-        'BqljjWyTnrioXPCNkCd4': 'female-qn-qingse',
+        '9lHjugDhwqoxA5MhX0az': 'ttv-voice-2026031023545326-M2Ysf3RQ',
+        'bhJUNIXWQQ94l8eI2VUf': 'ttv-voice-2026031023575226-mn9RwOnZ',
+        'BqljjWyTnrioXPCNkCd4': 'ttv-voice-2026031100011926-ouG12Sva',
         'APSIkVZudNbPAwyPoeVO': 'female-baiyang',
         'jqcCZkN6Knx8BJ5TBdYR': 'female-yina'
       };

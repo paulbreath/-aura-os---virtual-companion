@@ -27,7 +27,7 @@ export default function App() {
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelConfig>(getPreferredModel());
   const [selectedVoice, setSelectedVoice] = useState<string>(() => {
-    return localStorage.getItem('aura-selected-voice') || 'female-shaonv';
+    return localStorage.getItem('aura-selected-voice') || 'ttv-voice-2026031023545326-M2Ysf3RQ';
   });
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
