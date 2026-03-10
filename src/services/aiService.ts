@@ -1314,7 +1314,11 @@ export const generateSpeech = async (
       'jqcCZkN6Knx8BJ5TBdYR': 'jqcCZkN6Knx8BJ5TBdYR'
     };
 
-    const voiceId = voiceMap[voiceName] || voiceName;
+    const voiceId = voiceMap[voiceName];
+    if (!voiceId) {
+      console.log('🔊 ElevenLabs: Skipping - not an ElevenLabs voice');
+      return null;
+    }
 
     try {
       const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -1599,7 +1603,10 @@ export const generateSpeech = async (
     };
 
     // Try MiniMax TTS first (China-friendly)
-    if (import.meta.env.VITE_MINIMAX_TTS_KEY) {
+    const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY;
+    console.log('🔊 MiniMax TTS: API key exists:', !!apiKey, apiKey ? 'yes' : 'no');
+    if (apiKey) {
+      console.log('🔊 MiniMax TTS: Calling with voiceName:', voiceName);
       const minimaxResponse = await tryMiniMaxTTS();
       if (minimaxResponse) return minimaxResponse;
     }
