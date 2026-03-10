@@ -1555,22 +1555,23 @@ export const generateSpeech = async (
       const voiceId = voiceMap[voiceName] || 'female-shaonv';
 
       try {
-        const res = await fetch('https://api.minimax.chat/v1/t2a', {
+        const res = await fetch('https://api.minimaxi.chat/v1/t2a_v2', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'speech-2.8-turbo',
+            model: 'speech-02-hd',
             text: text,
-            voice_id: voiceId,
-            speed: 1.0,
-            vol: 1.0,
-            pitch: 0,
-            audio_sample_rate: 32000,
-            bitrate: 128000,
-            format: 'mp3'
+            voice_setting: {
+              voice_id: voiceId
+            },
+            audio_setting: {
+              sample_rate: 32000,
+              bitrate: 128000,
+              format: 'mp3'
+            }
           })
         });
 
@@ -1584,6 +1585,9 @@ export const generateSpeech = async (
         console.log('MiniMax TTS response:', data);
         if (data.data && data.data.audio) {
           return { data: data.data.audio, mimeType: 'audio/mp3' };
+        }
+        if (data.base_resp && data.base_resp.status_code !== 0) {
+          console.error('MiniMax TTS API error:', data.base_resp.status_msg);
         }
         console.warn('MiniMax TTS: No audio data in response');
         return null;
@@ -1605,16 +1609,16 @@ export const generateSpeech = async (
       if (azureResponse) return azureResponse;
     }
 
-    // Try browser TTS (always available)
-    const browserResult = await tryBrowserTTS();
-    if (browserResult) {
-      return browserResult;
-    }
-
     // Try ElevenLabs as backup
     if (import.meta.env.VITE_ELEVENLABS_API_KEY) {
       const elResponse = await tryElevenLabs();
       if (elResponse) return elResponse;
+    }
+
+    // Try browser TTS as last resort (always available)
+    const browserResult = await tryBrowserTTS();
+    if (browserResult) {
+      return browserResult;
     }
 
    // Last resort: Try Gemini TTS if configured (only if not in China and ai exists)
