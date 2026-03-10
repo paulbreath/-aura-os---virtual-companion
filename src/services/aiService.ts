@@ -15,6 +15,7 @@ interface ImportMetaEnv {
   readonly VITE_VOLCENGINE_TTS_TOKEN?: string;
   readonly VITE_AZURE_SPEECH_KEY?: string;
   readonly VITE_AZURE_SPEECH_REGION?: string;
+  readonly VITE_MINIMAX_TTS_KEY?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -179,34 +180,18 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
   'Auto': [
     { provider: 'auto', modelId: 'auto', name: 'Auto (Smart Routing)' }
   ],
-  'Gemini': [
-    { provider: 'gemini', modelId: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-    { provider: 'gemini', modelId: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro' }
+  'X.AI (Grok)': [
+    { provider: 'xai', modelId: 'grok-4-2025-01-20', name: 'Grok 4.1 Fast' },
+    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' }
   ],
   'DeepSeek': [
     { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' },
     { provider: 'deepseek', modelId: 'deepseek-reasoner', name: 'DeepSeek Reasoner' }
   ],
-  'Zeabur': [
-    { provider: 'zeabur', modelId: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-    { provider: 'zeabur', modelId: 'gpt-4o', name: 'GPT-4o' },
-    { provider: 'zeabur', modelId: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
-  ],
-  'StepFun': [
-    { provider: 'step', modelId: 'step-3-5-flash', name: 'Step 3.5 Flash' }
-  ],
-    'OpenRouter': [
-      { provider: 'openrouter', modelId: 'openrouter/dolphin-mistral-24b-venice-edition:free', name: 'Dolphin Mistral 24B' },
-      { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
-      { provider: 'openrouter', modelId: 'openrouter/qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B' },
-      { provider: 'openrouter', modelId: 'openrouter/anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-      { provider: 'openrouter', modelId: 'openrouter/mistralai/mixtral-8x7b-instruct', name: 'Mixtral 8x7B' },
-      { provider: 'openrouter', modelId: 'openrouter/google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-      { provider: 'openrouter', modelId: 'openrouter/microsoft/phi-3.5-mini-instruct', name: 'Phi 3.5 Mini' },
-      { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B' },
-      { provider: 'openrouter', modelId: 'openrouter/google/gemini-pro-1.5', name: 'Gemini Pro 1.5' }
-    ]
- };
+  'MiniMax (Free)': [
+    { provider: 'openrouter', modelId: 'openrouter/minimax/m2.1-functioncalling', name: 'MiniMax M2.1 Free' }
+  ]
+};
 
 let isUserInChina: boolean | null = null;
 let preferredModel: ModelConfig = AVAILABLE_MODELS['Auto'][0];
@@ -1478,6 +1463,64 @@ export const generateSpeech = async (
       }
     });
   };
+
+    // Try MiniMax TTS if configured (China-friendly)
+    const tryMiniMaxTTS = async () => {
+      const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY;
+      if (!apiKey) return null;
+
+      const voiceMap: Record<string, string> = {
+        '9lHjugDhwqoxA5MhX0az': 'male-qn-qingse',  // Aura
+        'bhJUNIXWQQ94l8eI2VUf': 'male-qn-jingying', // Nova
+        'BqljjWyTnrioXPCNkCd4': 'female-shaonv',    // Serena
+        'APSIkVZudNbPAwyPoeVO': 'female-yujie',    // Atlas
+        'jqcCZkN6Knx8BJ5TBdYR': 'female-qn-qingse'  // Orion
+      };
+
+      const voiceId = voiceMap[voiceName] || 'female-shaonv';
+
+      try {
+        const res = await fetch('https://api.minimax.chat/v1/t2a', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'speech-2.8-turbo',
+            text: text,
+            voice_id: voiceId,
+            speed: 1.0,
+            vol: 1.0,
+            pitch: 0,
+            audio_sample_rate: 32000,
+            bitrate: 128000,
+            format: 'mp3'
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.text();
+          console.error('MiniMax TTS error:', error);
+          return null;
+        }
+
+        const data = await res.json();
+        if (data.data && data.data.audio) {
+          return { data: data.data.audio, mimeType: 'audio/mp3' };
+        }
+        return null;
+      } catch (e) {
+        console.error("MiniMax TTS failed:", e);
+        return null;
+      }
+    };
+
+    // Try MiniMax TTS first (China-friendly)
+    if (import.meta.env.VITE_MINIMAX_TTS_KEY) {
+      const minimaxResponse = await tryMiniMaxTTS();
+      if (minimaxResponse) return minimaxResponse;
+    }
 
     // Try Azure TTS if configured
     if (import.meta.env.VITE_AZURE_SPEECH_KEY) {
