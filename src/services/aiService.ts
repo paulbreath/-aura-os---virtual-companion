@@ -1295,6 +1295,14 @@ export const generateSelfie = async (
   return null;
 };
 
+const hexToBinary = (hex: string): string => {
+  let binary = '';
+  for (let i = 0; i < hex.length; i += 2) {
+    binary += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+  }
+  return binary;
+};
+
 export const generateSpeech = async (
   text: string,
   voiceName: string
@@ -1572,11 +1580,11 @@ export const generateSpeech = async (
               voice_id: voiceId
             },
             audio_setting: {
-              audio_sample_rate: 32000,
+              sample_rate: 32000,
               bitrate: 128000,
               format: 'mp3'
             },
-            output_format: 'base64'
+            output_format: 'hex'
           })
         });
 
@@ -1589,7 +1597,10 @@ export const generateSpeech = async (
         const data = await res.json();
         console.log('MiniMax TTS response:', data);
         if (data.data && data.data.audio) {
-          return { data: data.data.audio, mimeType: 'audio/mp3' };
+          const hexAudio = data.data.audio;
+          const binaryString = hexToBinary(hexAudio);
+          const base64Audio = btoa(binaryString);
+          return { data: base64Audio, mimeType: 'audio/mp3' };
         }
         if (data.base_resp && data.base_resp.status_code !== 0) {
           console.error('MiniMax TTS API error:', data.base_resp.status_msg);
