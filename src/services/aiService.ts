@@ -181,8 +181,8 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
     { provider: 'auto', modelId: 'auto', name: 'Auto (Smart Routing)' }
   ],
   'X.AI (Grok)': [
-    { provider: 'xai', modelId: 'grok-4-2025-01-20', name: 'Grok 4.1 Fast' },
-    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' }
+    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' },
+    { provider: 'xai', modelId: 'grok-beta', name: 'Grok Beta' }
   ],
   'DeepSeek': [
     { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' },
