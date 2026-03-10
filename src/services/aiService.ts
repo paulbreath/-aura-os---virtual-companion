@@ -1518,14 +1518,31 @@ export const generateSpeech = async (
     // Try MiniMax TTS if configured (China-friendly)
     const tryMiniMaxTTS = async () => {
       const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY;
-      if (!apiKey) return null;
+      if (!apiKey) {
+        console.log('🔊 MiniMax TTS: No API key configured');
+        return null;
+      }
+
+      console.log('🔊 MiniMax TTS: Trying with voiceId:', voiceName);
 
       const voiceMap: Record<string, string> = {
-        '9lHjugDhwqoxA5MhX0az': 'female-shaonv',      // Aura - 少女
-        'bhJUNIXWQQ94l8eI2VUf': 'female-yujie',        // Nova - 御姐
-        'BqljjWyTnrioXPCNkCd4': 'female-qn-qingse',    // Serena - 青涩
-        'APSIkVZudNbPAwyPoeVO': 'female-baiyang',      // Atlas - 白杨
-        'jqcCZkN6Knx8BJ5TBdYR': 'female-yina'          // Orion - 伊娜
+        // New MiniMax voice IDs (directly pass through)
+        'female-shaonv': 'female-shaonv',
+        'female-qn-qingse': 'female-qn-qingse',
+        'female-yujie': 'female-yujie',
+        'female-baiyang': 'female-baiyang',
+        'female-yina': 'female-yina',
+        'female-qn-jingying': 'female-qn-jingying',
+        'female-xiaoqi': 'female-xiaoqi',
+        'female-langman': 'female-langman',
+        'female-sitong': 'female-sitong',
+        'female-douyin': 'female-douyin',
+        // Legacy ElevenLabs voice IDs (map to MiniMax voices)
+        '9lHjugDhwqoxA5MhX0az': 'female-shaonv',
+        'bhJUNIXWQQ94l8eI2VUf': 'female-yujie',
+        'BqljjWyTnrioXPCNkCd4': 'female-qn-qingse',
+        'APSIkVZudNbPAwyPoeVO': 'female-baiyang',
+        'jqcCZkN6Knx8BJ5TBdYR': 'female-yina'
       };
 
       const voiceId = voiceMap[voiceName] || 'female-shaonv';
@@ -1557,9 +1574,11 @@ export const generateSpeech = async (
         }
 
         const data = await res.json();
+        console.log('MiniMax TTS response:', data);
         if (data.data && data.data.audio) {
           return { data: data.data.audio, mimeType: 'audio/mp3' };
         }
+        console.warn('MiniMax TTS: No audio data in response');
         return null;
       } catch (e) {
         console.error("MiniMax TTS failed:", e);
