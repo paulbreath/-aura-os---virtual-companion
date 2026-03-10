@@ -1571,7 +1571,8 @@ export const generateSpeech = async (
               audio_sample_rate: 32000,
               bitrate: 128000,
               format: 'mp3'
-            }
+            },
+            output_format: 'base64'
           })
         });
 
