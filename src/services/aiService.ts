@@ -168,7 +168,7 @@ export interface Message {
   senderName?: string;
 }
 
-export type Provider = 'auto' | 'gemini' | 'deepseek' | 'zeabur' | 'step' | 'openrouter' | 'xai';
+export type Provider = 'auto' | 'gemini' | 'deepseek' | 'zeabur' | 'step' | 'openrouter' | 'xai' | 'minimax';
 
 export interface ModelConfig {
   provider: Provider;
@@ -181,15 +181,14 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
     { provider: 'auto', modelId: 'auto', name: 'Auto (Smart Routing)' }
   ],
   'X.AI (Grok)': [
-    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' },
-    { provider: 'xai', modelId: 'grok-beta', name: 'Grok Beta' }
+    { provider: 'xai', modelId: 'grok-4-latest', name: 'Grok 4' },
+    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' }
   ],
   'DeepSeek': [
-    { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' },
-    { provider: 'deepseek', modelId: 'deepseek-reasoner', name: 'DeepSeek Reasoner' }
+    { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' }
   ],
   'MiniMax (Free)': [
-    { provider: 'openrouter', modelId: 'openrouter/minimax/m2.1-functioncalling', name: 'MiniMax M2.1 Free' }
+    { provider: 'openrouter', modelId: 'openrouter/minimax/minimax-text-01', name: 'MiniMax Text 01' }
   ]
 };
 
@@ -516,6 +515,37 @@ const callXai = async (systemInstruction: string, messages: any[], temperature: 
 
   if (!res.ok) {
     throw new Error(`X.AI API error: ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content;
+};
+
+const callMiniMax = async (systemInstruction: string, messages: any[], temperature: number, modelId: string = 'MiniMax-Text-01') => {
+  const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY; // Using the same key for now
+  if (!apiKey) {
+    console.warn("MiniMax API key is missing. Skipping MiniMax.");
+    return null;
+  }
+
+  const res = await fetch('https://api.minimax.chat/v1/text/chatcompletion', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        ...messages
+      ],
+      temperature: temperature
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`MiniMax API error: ${res.statusText}`);
   }
 
   const data = await res.json();
@@ -900,6 +930,12 @@ export const generateResponse = async (
       return !!res;
     };
 
+    const tryMiniMax = async (modelId = 'MiniMax-Text-01') => {
+      const res = await withRetry(() => callMiniMax(systemInstruction, contents, avatar.temperature, modelId));
+      if (res) text = res;
+      return !!res;
+    };
+
   const tryGemini = async (modelId = 'gemini-3-flash-preview') => {
     if (!ai) throw new Error("Gemini API key not configured");
     const response = await withRetry(() => ai.models.generateContent({
@@ -912,21 +948,23 @@ export const generateResponse = async (
     }));
     text = response.text || '';
     return !!text;
-  };
+   };
 
    try {
-    if (preferredModel.provider === 'zeabur') {
-      await tryZeabur(preferredModel.modelId);
-    } else if (preferredModel.provider === 'deepseek') {
-      await tryDeepSeek(preferredModel.modelId);
-    } else if (preferredModel.provider === 'step') {
-      await tryStep(preferredModel.modelId);
-    } else if (preferredModel.provider === 'openrouter') {
-      await tryOpenRouter(preferredModel.modelId);
-    } else if (preferredModel.provider === 'xai') {
-      await tryXai(preferredModel.modelId);
-    } else if (preferredModel.provider === 'gemini') {
-      await tryGemini(preferredModel.modelId);
+     if (preferredModel.provider === 'zeabur') {
+       await tryZeabur(preferredModel.modelId);
+     } else if (preferredModel.provider === 'deepseek') {
+       await tryDeepSeek(preferredModel.modelId);
+     } else if (preferredModel.provider === 'step') {
+       await tryStep(preferredModel.modelId);
+     } else if (preferredModel.provider === 'openrouter') {
+       await tryOpenRouter(preferredModel.modelId);
+     } else if (preferredModel.provider === 'xai') {
+       await tryXai(preferredModel.modelId);
+     } else if (preferredModel.provider === 'gemini') {
+       await tryGemini(preferredModel.modelId);
+     } else if (preferredModel.provider === 'minimax') {
+       await tryMiniMax(preferredModel.modelId);
      } else {
        // Auto routing
        if (inChina) {
