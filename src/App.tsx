@@ -34,6 +34,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : {};
   });
   const [showAvatarVoiceMenu, setShowAvatarVoiceMenu] = useState<string | null>(null);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [selectedMentionTarget, setSelectedMentionTarget] = useState<'all' | Avatar | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
     return Object.keys(AVAILABLE_MODELS).find(key =>
@@ -291,7 +293,7 @@ export default function App() {
           
           let audioData = undefined;
           if (voiceMode) {
-            const speech = await generateSpeech(aiResponse, getAvatarVoice(currentAvatar.id));
+            const speech = await generateSpeech(aiResponse, getAvatarVoice(avatar.id));
             if (speech) audioData = speech;
           }
 
@@ -840,11 +842,54 @@ export default function App() {
               <input
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInput(val);
+                  // Show mention picker when @ is typed in group chat
+                  if (chatMode === 'group' && val.endsWith('@')) {
+                    setShowMentionPicker(true);
+                    setSelectedMentionTarget(null);
+                  } else if (chatMode === 'group' && val.includes('@')) {
+                    // Keep picker open while typing @name
+                  } else {
+                    setShowMentionPicker(false);
+                  }
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={chatMode === 'solo' ? `Message ${currentAvatar.name}...` : `Message the group (use @Name)...`}
+                placeholder={chatMode === 'solo' ? `Message ${currentAvatar.name}...` : `Message the group (@ for options)...`}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-full pl-5 pr-12 py-3.5 text-[15px] focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
               />
+              {showMentionPicker && chatMode === 'group' && (
+                <div className="absolute bottom-full left-0 mb-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50">
+                  <button
+                    onClick={() => {
+                      setSelectedMentionTarget('all');
+                      setInput(input.replace(/@$/, '@ALL '));
+                      setShowMentionPicker(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 flex items-center gap-2"
+                  >
+                    <Users size={14} className="text-indigo-400" />
+                    <span className="font-medium">ALL</span>
+                    <span className="text-zinc-500 text-xs">- 所有角色回复</span>
+                  </button>
+                  {groupMembers.map(avatar => (
+                    <button
+                      key={avatar.id}
+                      onClick={() => {
+                        setSelectedMentionTarget(avatar);
+                        setInput(input.replace(/@$/, `@${avatar.name} `));
+                        setShowMentionPicker(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 flex items-center gap-2"
+                    >
+                      <img src={`https://picsum.photos/seed/${avatar.seed}/30/30`} alt={avatar.name} className="w-5 h-5 rounded-full" />
+                      <span className="font-medium">{avatar.name}</span>
+                      <span className="text-zinc-500 text-xs">- {avatar.tagline}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isTyping}

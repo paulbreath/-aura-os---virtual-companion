@@ -1314,7 +1314,7 @@ export const generateSelfie = async (
           'Authorization': `Bearer ${xaiKey}`,
         },
         body: JSON.stringify({
-          model: 'grok-2-image',
+          model: 'grok-imagine-image',
           prompt: finalPrompt,
           n: 1,
           aspect_ratio: '1:1'
