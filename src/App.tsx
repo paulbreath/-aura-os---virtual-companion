@@ -198,33 +198,41 @@ export default function App() {
         }
       }
       
-      // Solo chat heartbeat (less frequent)
-      if (chatMode === 'solo' && Math.random() > 0.9 && !isTyping) {
-        const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
+      // Solo chat: if no user input for 1 second, character continues conversation
+      if (chatMode === 'solo' && !isTyping && messages.length > 0) {
+        const lastMsg = messages[messages.length - 1];
+        const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
         
-         try {
-           const action = await generateAutonomousAction(currentAvatar, recentContext, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
-           if (action.shouldAct && action.message) {
-            let audioData = undefined;
-            if (voiceMode) {
-              const speech = await generateSpeech(action.message, getAvatarVoice(currentAvatar.id));
-              if (speech) audioData = speech;
+        // If more than 1 second has passed since last message
+        if (timeSinceLastMsg > 1000) {
+          const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
+          
+          try {
+            const action = await generateAutonomousAction(currentAvatar, recentContext, false, []);
+            if (action.shouldAct && action.message) {
+              let audioData: { data: string; mimeType: string } | undefined;
+              if (voiceMode) {
+                const speech = await generateSpeech(action.message, getAvatarVoice(currentAvatar.id));
+                if (speech) audioData = speech;
+              }
+
+              const newMsg: Message = {
+                id: Date.now().toString(),
+                role: 'model',
+                content: action.message,
+                timestamp: new Date(),
+                source: action.platform as any || 'direct',
+                senderId: currentAvatar.id,
+                senderName: currentAvatar.name,
+                audioData
+              };
+
+              setMessages(prev => [...prev, newMsg]);
+              if (audioData) playAudio(audioData);
             }
-
-            const newMsg: Message = {
-              id: Date.now().toString(),
-              role: 'model',
-              content: action.message,
-              timestamp: new Date(),
-              source: action.platform as any || 'direct',
-              audioData
-            };
-
-            setMessages(prev => [...prev, newMsg]);
-            if (audioData) playAudio(audioData);
+          } catch (e) {
+            console.error("Solo chat auto-reply error", e);
           }
-        } catch (e) {
-          console.error("Heartbeat error", e);
         }
       }
     }, 1000);
