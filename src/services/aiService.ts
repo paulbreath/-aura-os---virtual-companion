@@ -1317,21 +1317,16 @@ export const generateSelfie = async (
           model: 'grok-imagine-image',
           prompt: finalPrompt,
           n: 1,
-          aspect_ratio: '1:1'
+          aspect_ratio: '1:1',
+          response_format: 'b64_json'
         }),
       });
       
       if (xaiRes.ok) {
         const data = await xaiRes.json();
         console.log('X.AI response:', data);
-        if (data.data && data.data[0]?.url) {
-          const imgRes = await fetch(data.data[0].url);
-          const blob = await imgRes.blob();
-          const buffer = await blob.arrayBuffer();
-          const base64 = btoa(
-            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
-          return `data:image/png;base64,${base64}`;
+        if (data.data && data.data[0]?.b64_json) {
+          return `data:image/png;base64,${data.data[0].b64_json}`;
         }
       } else {
         const errorText = await xaiRes.text();
