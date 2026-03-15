@@ -1183,8 +1183,10 @@ If you decide not to send anything right now, return null.
 
   try {
     const result = JSON.parse(responseText);
+    console.log('generateAutonomousAction result:', result);
     return result;
   } catch (e) {
+    console.error('generateAutonomousAction parse error, response was:', responseText);
     return { shouldAct: false };
   }
 };

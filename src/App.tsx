@@ -216,11 +216,13 @@ export default function App() {
         
         // If more than 2 seconds have passed since user's last message
         if (timeSinceLastUserMsg > 2000) {
+          console.log('Solo auto-reply: triggering...', currentAvatar.name);
           setIsTyping(true);
           const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
           
           try {
             const action = await generateAutonomousAction(currentAvatar, recentContext, false, []);
+            console.log('Solo auto-reply: action result:', action);
             if (action.shouldAct && action.message) {
               let audioData: { data: string; mimeType: string } | undefined;
               if (voiceMode) {
