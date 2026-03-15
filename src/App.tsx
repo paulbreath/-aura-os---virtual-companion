@@ -165,8 +165,9 @@ export default function App() {
         const lastMsg = messages[messages.length - 1];
         const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
         
-        // If more than 2-3 seconds have passed since last message
-        if (timeSinceLastMsg > 2000 + Math.random() * 1000) {
+        // If more than 3-5 seconds have passed since last message (random)
+        const randomDelay = 3000 + Math.random() * 2000;
+        if (timeSinceLastMsg > randomDelay) {
           // Pick a random avatar from group members
           const randomAvatar = groupMembers[Math.floor(Math.random() * groupMembers.length)];
           const recentContext = messages.slice(-5).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
@@ -216,8 +217,9 @@ export default function App() {
         
         const timeSinceLastUserMsg = Date.now() - new Date(lastUserMsg.timestamp).getTime();
         
-        // If more than 2 seconds have passed since user's last message
-        if (timeSinceLastUserMsg > 2000) {
+        // If more than 2-5 seconds have passed since user's last message (random)
+        const randomDelay = 2000 + Math.random() * 3000;
+        if (timeSinceLastUserMsg > randomDelay) {
           console.log('Solo auto-reply: triggering...', currentAvatar.name);
           setIsTyping(true);
           const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
