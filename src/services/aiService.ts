@@ -1310,26 +1310,15 @@ export const generateSelfie = async (
     }
   }
   
-  enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance with previous images.`;
+  enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance.`;
   
-  const finalPrompt = `${enhancedPrompt} Recent conversation context: ${context}`;
-
-  // Primary: Server proxy (avoids CORS, uses configured APIs)
-  try {
-    const proxyRes = await fetch('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: finalPrompt }),
-    });
-    if (proxyRes.ok) {
-      const data = await proxyRes.json();
-      if (data.image) return data.image;
-    }
-  } catch (error) {
-    console.warn("Server proxy failed, will try fallbacks:", error);
+  // Truncate prompt if too long (Pollinations has limits)
+  let finalPrompt = enhancedPrompt;
+  if (finalPrompt.length > 500) {
+    finalPrompt = finalPrompt.substring(0, 500);
   }
 
-  // Fallback 1: Pollinations.ai (no CORS, no API key)
+  // Primary: Pollinations.ai (no CORS, no API key) - direct URL method
   try {
     const seed = Date.now();
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
@@ -1346,26 +1335,6 @@ export const generateSelfie = async (
     }
   } catch (error) {
     console.warn("Pollinations.ai failed:", error);
-  }
-
-  // Fallback 2: Gemini image generation
-  if (ai) {
-    try {
-      const imageModel = 'gemini-2.0-flash-exp';
-      const response = await withRetry(() => ai.models.generateContent({
-        model: imageModel,
-        contents: [{ parts: [{ text: finalPrompt }] }],
-        config: { responseModalities: ['IMAGE'] }
-      }));
-
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
-      }
-    } catch (error) {
-      console.error("Gemini image generation failed:", error);
-    }
   }
 
   console.error("All image generation methods failed");
