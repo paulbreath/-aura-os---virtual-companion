@@ -36,6 +36,7 @@ export default function App() {
   const [showAvatarVoiceMenu, setShowAvatarVoiceMenu] = useState<string | null>(null);
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [selectedMentionTarget, setSelectedMentionTarget] = useState<'all' | Avatar | null>(null);
+  const [selfieMode, setSelfieMode] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
     return Object.keys(AVAILABLE_MODELS).find(key =>
@@ -281,6 +282,56 @@ export default function App() {
   const handleSend = async () => {
     if (!input.trim()) return;
 
+    // Check if in selfie mode - generate selfie with user's prompt
+    if (selfieMode) {
+      const userPrompt = input.trim();
+      setSelfieMode(false);
+      setInput('');
+      setIsTyping(true);
+
+      const requestMsg: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: userPrompt,
+        timestamp: new Date(),
+        source: 'direct'
+      };
+      setMessages(prev => [...prev, requestMsg]);
+
+      try {
+        const recentContext = messages.slice(-6).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
+        const imageUrl = await generateSelfie(currentAvatar, recentContext, userPrompt, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
+
+        if (imageUrl) {
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: 'model',
+            content: "Here's your selfie! 📸",
+            imageUrl: imageUrl,
+            timestamp: new Date(),
+            source: 'direct',
+            senderId: currentAvatar.id,
+            senderName: currentAvatar.name
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: 'model',
+            content: "Sorry, I couldn't take a photo right now.",
+            timestamp: new Date(),
+            source: 'direct',
+            senderId: currentAvatar.id,
+            senderName: currentAvatar.name
+          }]);
+        }
+      } catch (error) {
+        console.error("Error generating selfie:", error);
+      } finally {
+        setIsTyping(false);
+      }
+      return;
+    }
+
     const newUserMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -378,50 +429,13 @@ export default function App() {
     }
   };
 
-  const handleRequestSelfie = async () => {
-    setIsTyping(true);
-    
-    const requestMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: "Can you send me a selfie? 📸",
-      timestamp: new Date(),
-      source: 'direct'
-    };
-    setMessages(prev => [...prev, requestMsg]);
-
-     try {
-        // Get more context for better scene generation
-        const recentContext = messages.slice(-6).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
-        const imageUrl = await generateSelfie(currentAvatar, recentContext, requestMsg.content, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
-      
-      if (imageUrl) {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: 'model',
-          content: "Here's a picture for you!",
-          imageUrl: imageUrl,
-          timestamp: new Date(),
-          source: 'direct',
-          senderId: currentAvatar.id,
-          senderName: currentAvatar.name
-        }]);
-      } else {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: 'model',
-          content: "Sorry, I couldn't take a photo right now.",
-          timestamp: new Date(),
-          source: 'direct',
-          senderId: currentAvatar.id,
-          senderName: currentAvatar.name
-        }]);
-      }
-    } catch (error) {
-      console.error("Error generating selfie:", error);
-    } finally {
-      setIsTyping(false);
-    }
+  const handleRequestSelfie = () => {
+    // Set selfie mode and focus on input for user to type prompt
+    setSelfieMode(true);
+    setInput('');
+    // Focus on the input
+    const inputEl = document.querySelector('input[type="text"]') as HTMLInputElement;
+    if (inputEl) inputEl.focus();
   };
 
   const switchAvatar = (avatar: Avatar) => {
@@ -909,7 +923,7 @@ export default function App() {
                   }
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={chatMode === 'solo' ? `Message ${currentAvatar.name}...` : `Message the group (@ for options)...`}
+                placeholder={selfieMode ? '描述你想要的自拍（如：穿着丝袜）...' : (chatMode === 'solo' ? `Message ${currentAvatar.name}...` : `Message the group (@ for options)...`)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-full pl-5 pr-12 py-3.5 text-[15px] focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all shadow-inner"
               />
               {showMentionPicker && chatMode === 'group' && (
