@@ -162,8 +162,8 @@ export default function App() {
         const lastMsg = messages[messages.length - 1];
         const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
         
-        // If more than 1 second has passed since last message
-        if (timeSinceLastMsg > 1000) {
+        // If more than 2-3 seconds have passed since last message
+        if (timeSinceLastMsg > 2000 + Math.random() * 1000) {
           // Pick a random avatar from group members
           const randomAvatar = groupMembers[Math.floor(Math.random() * groupMembers.length)];
           const recentContext = messages.slice(-5).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
