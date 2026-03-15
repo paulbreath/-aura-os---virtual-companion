@@ -84,7 +84,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Caucasian woman with blonde hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'aura-sweet',
      temperature: 0.9,
-     voiceName: '9lHjugDhwqoxA5MhX0az',
+     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ', // Aura voice
      llmProvider: 'openrouter',
      llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
      visualTraits: {
@@ -103,7 +103,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'nova-gamer',
      temperature: 0.95,
-     voiceName: 'bhJUNIXWQQ94l8eI2VUf',
+     voiceName: 'ttv-voice-2026031023575226-mn9RwOnZ', // NOVA voice
      llmProvider: 'xai',
      llmModelId: 'grok-2-1212',
      visualTraits: {
@@ -122,7 +122,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Caucasian woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'serena-office',
      temperature: 0.7,
-     voiceName: 'BqljjWyTnrioXPCNkCd4',
+     voiceName: 'ttv-voice-2026031100011926-ouG12Sva', // Serena voice
      llmProvider: 'openrouter',
      llmModelId: 'openrouter/anthropic/claude-3.5-sonnet',
      visualTraits: {
@@ -141,7 +141,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Asian woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'atlas-queen',
      temperature: 0.6,
-     voiceName: 'APSIkVZudNbPAwyPoeVO',
+     voiceName: 'ttv-voice-2026031100011926-ouG12Sva', // Serena voice (backup)
      llmProvider: 'openrouter',
      llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
      visualTraits: {
@@ -160,7 +160,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Japanese woman with light brown hair, smiling, looking at camera, outdoors, natural light, high quality photo.',
      seed: 'orion-sport',
      temperature: 0.8,
-     voiceName: 'jqcCZkN6Knx8BJ5TBdYR',
+     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ', // Aura voice (backup)
      llmProvider: 'openrouter',
      llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
      visualTraits: {
