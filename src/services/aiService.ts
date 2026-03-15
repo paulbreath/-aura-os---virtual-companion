@@ -1302,19 +1302,45 @@ export const generateSelfie = async (
   
   const finalPrompt = enhancedPrompt;
   
-  // Primary: Server proxy (uses X.AI Grok Imagine)
-  try {
-    const proxyRes = await fetch('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: finalPrompt }),
-    });
-    if (proxyRes.ok) {
-      const data = await proxyRes.json();
-      if (data.image) return data.image;
+  // Primary: X.AI Grok 2 Image (direct API call)
+  const xaiKey = import.meta.env.VITE_XAI_API_KEY;
+  if (xaiKey) {
+    try {
+      console.log('Trying X.AI Grok 2 Image directly...');
+      const xaiRes = await fetch('https://api.x.ai/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${xaiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'grok-2-image',
+          prompt: finalPrompt,
+          n: 1,
+          size: '1024x1024',
+          response_format: 'url',
+        }),
+      });
+      
+      if (xaiRes.ok) {
+        const data = await xaiRes.json();
+        console.log('X.AI response:', data);
+        if (data.data && data.data[0]?.url) {
+          const imgRes = await fetch(data.data[0].url);
+          const blob = await imgRes.blob();
+          const buffer = await blob.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          return `data:image/png;base64,${base64}`;
+        }
+      } else {
+        const errorText = await xaiRes.text();
+        console.error('X.AI error:', xaiRes.status, errorText);
+      }
+    } catch (error) {
+      console.error('X.AI direct call failed:', error);
     }
-  } catch (error) {
-    console.warn("Server proxy failed, will try fallbacks:", error);
   }
 
   // Fallback: Pollinations.ai
