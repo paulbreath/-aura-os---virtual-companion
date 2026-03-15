@@ -87,7 +87,7 @@ app.post('/api/generate-image', async (req, res) => {
             'Authorization': `Bearer ${xaiKey}`,
           },
           body: JSON.stringify({
-            model: 'grok-imagine-image',
+            model: 'grok-2-image',
             prompt: prompt,
             n: 1,
             size: '1024x1024',
