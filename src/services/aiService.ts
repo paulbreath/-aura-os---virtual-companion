@@ -105,7 +105,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.95,
      voiceName: 'ttv-voice-2026031023575226-mn9RwOnZ',
      llmProvider: 'xai',
-     llmModelId: 'grok-2-1212',
+      llmModelId: 'grok-4-latest',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -124,7 +124,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.7,
      voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
      llmProvider: 'xai',
-     llmModelId: 'grok-2-1212',
+      llmModelId: 'grok-4-latest',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -143,7 +143,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.6,
      voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
      llmProvider: 'xai',
-     llmModelId: 'grok-2-1212',
+      llmModelId: 'grok-4-latest',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -162,7 +162,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.8,
      voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
      llmProvider: 'xai',
-     llmModelId: 'grok-2-1212',
+      llmModelId: 'grok-4-latest',
      visualTraits: {
        hair: 'light brown hair',
        eyes: 'brown eyes',
