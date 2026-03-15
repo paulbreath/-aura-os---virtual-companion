@@ -31,9 +31,9 @@ export default function App() {
   });
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
-    return model.provider === 'auto' ? 'Auto' : Object.keys(AVAILABLE_MODELS).find(key =>
+    return Object.keys(AVAILABLE_MODELS).find(key =>
       AVAILABLE_MODELS[key].some(m => m.provider === model.provider && m.modelId === model.modelId)
-    ) || 'Auto';
+    ) || 'X.AI (Grok)';
   });
   const [avatarBackgrounds, setAvatarBackgrounds] = useState<Record<string, string>>(() => {
     try {
@@ -102,12 +102,11 @@ export default function App() {
      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
    };
 
-   const getProviderGroupName = (model: ModelConfig): string => {
-     if (model.provider === 'auto') return 'Auto';
-     return Object.keys(AVAILABLE_MODELS).find(key => 
-       AVAILABLE_MODELS[key].some(m => m.provider === model.provider && m.modelId === model.modelId)
-     ) || 'Auto';
-   };
+    const getProviderGroupName = (model: ModelConfig): string => {
+      return Object.keys(AVAILABLE_MODELS).find(key => 
+        AVAILABLE_MODELS[key].some(m => m.provider === model.provider && m.modelId === model.modelId)
+      ) || 'X.AI (Grok)';
+    };
 
   useEffect(() => {
     scrollToBottom();

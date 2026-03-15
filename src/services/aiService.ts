@@ -193,9 +193,6 @@ export interface ModelConfig {
 }
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
-  'Auto': [
-    { provider: 'auto', modelId: 'auto', name: 'Auto (Smart Routing)' }
-  ],
   'X.AI (Grok)': [
     { provider: 'xai', modelId: 'grok-4-latest', name: 'Grok 4' },
     { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' }
@@ -209,7 +206,7 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
 };
 
 let isUserInChina: boolean | null = null;
-let preferredModel: ModelConfig = AVAILABLE_MODELS['Auto'][0];
+let preferredModel: ModelConfig = AVAILABLE_MODELS['X.AI (Grok)'][0];
 
 export const setPreferredModel = (model: ModelConfig) => {
   preferredModel = model;
