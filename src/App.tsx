@@ -175,8 +175,10 @@ export default function App() {
           setIsTyping(true);
           try {
             const action = await generateAutonomousAction(randomAvatar, recentContext, true, groupMembers);
+            console.log('Group auto-reply: action result:', action);
             // Support both {shouldAct: true} and {action: 'send'} formats
             const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message';
+            console.log('Group auto-reply: shouldAct:', shouldAct, 'message:', action.message);
             if (shouldAct && action.message) {
               let audioData: { data: string; mimeType: string } | undefined;
               if (voiceMode) {
