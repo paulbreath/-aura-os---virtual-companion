@@ -321,8 +321,9 @@ export default function App() {
     setMessages(prev => [...prev, requestMsg]);
 
      try {
-       const recentContext = messages.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n');
-       const imageUrl = await generateSelfie(currentAvatar, recentContext, requestMsg.content, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
+        // Get more context for better scene generation
+        const recentContext = messages.slice(-6).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
+        const imageUrl = await generateSelfie(currentAvatar, recentContext, requestMsg.content, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
       
       if (imageUrl) {
         setMessages(prev => [...prev, {

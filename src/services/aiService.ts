@@ -1208,15 +1208,95 @@ export const generateSelfie = async (
   isGroup: boolean = false,
   groupMembers: Avatar[] = []
 ): Promise<string | null> => {
-  // Build enhanced prompt with simple, safe descriptions
+  // Analyze context to determine scene/environment/mood
+  const contextLower = context.toLowerCase();
+  
+  // Detect time of day
+  let timeOfDay = '';
+  if (contextLower.includes('morning') || contextLower.includes('早上') || contextLower.includes('早餐')) {
+    timeOfDay = 'morning light, bright and fresh';
+  } else if (contextLower.includes('night') || contextLower.includes('晚上') || contextLower.includes('晚')) {
+    timeOfDay = 'evening, soft warm lighting, cozy atmosphere';
+  } else if (contextLower.includes('afternoon') || contextLower.includes('下午')) {
+    timeOfDay = 'afternoon sunlight, warm glow';
+  }
+  
+  // Detect location/scene
+  let location = '';
+  if (contextLower.includes('beach') || contextLower.includes('海') || contextLower.includes('沙滩')) {
+    location = 'at the beach, ocean behind';
+  } else if (contextLower.includes('park') || contextLower.includes('公园') || contextLower.includes('野餐')) {
+    location = 'in a beautiful park, nature background';
+  } else if (contextLower.includes('cafe') || contextLower.includes('咖啡') || contextLower.includes('coffee')) {
+    location = 'in a cozy café, warm ambient lighting';
+  } else if (contextLower.includes('bed') || contextLower.includes('床') || contextLower.includes('sleep')) {
+    location = 'in bedroom, soft lighting, relaxed';
+  } else if (contextLower.includes('work') || contextLower.includes('office') || contextLower.includes('工作')) {
+    location = 'in a modern office setting';
+  } else if (contextLower.includes('home') || contextLower.includes('家') || contextLower.includes('room')) {
+    location = 'at home, warm and comfortable setting';
+  } else if (contextLower.includes('street') || contextLower.includes('街') || contextLower.includes('city')) {
+    location = 'outdoor urban street, city background';
+  }
+  
+  // Detect mood/emotion
+  let mood = '';
+  if (contextLower.includes('happy') || contextLower.includes('开心') || contextLower.includes('高兴') || contextLower.includes('love') || contextLower.includes('爱')) {
+    mood = 'happy, smiling warmly';
+  } else if (contextLower.includes('sad') || contextLower.includes('难过') || contextLower.includes('伤心')) {
+    mood = 'slightly melancholic, thoughtful expression';
+  } else if (contextLower.includes('flirt') || contextLower.includes('调情') || contextLower.includes('miss') || contextLower.includes('想')) {
+    mood = 'flirty, playful, looking at camera with affection';
+  } else if (contextLower.includes('sleepy') || contextLower.includes('困') || contextLower.includes(' tired')) {
+    mood = 'soft, sleepy, relaxed';
+  } else {
+    mood = 'natural, friendly smile';
+  }
+  
+  // Detect activities
+  let activity = '';
+  if (contextLower.includes('eat') || contextLower.includes('吃') || contextLower.includes('food') || contextLower.includes('饭')) {
+    activity = 'enjoying a meal';
+  } else if (contextLower.includes('study') || contextLower.includes('学习') || contextLower.includes('book') || contextLower.includes('书')) {
+    activity = 'reading a book';
+  } else if (contextLower.includes('music') || contextLower.includes('音乐') || contextLower.includes('sing') || contextLower.includes('歌')) {
+    activity = 'listening to music';
+  } else if (contextLower.includes('exercise') || contextLower.includes('运动') || contextLower.includes('gym')) {
+    activity = 'after workout, energetic';
+  } else if (contextLower.includes('shower') || contextLower.includes('洗澡') || contextLower.includes('bath')) {
+    activity = 'fresh from shower, natural wet hair';
+  } else if (contextLower.includes('sleep') || contextLower.includes('睡觉') || contextLower.includes('bed')) {
+    activity = 'just woke up, sleepy face';
+  }
+  
+  // Build enhanced prompt
   let enhancedPrompt = avatar.imagePrompt;
   
+  // Add location/scene
+  if (location) {
+    enhancedPrompt += ` ${location}.`;
+  }
+  
+  // Add time of day lighting
+  if (timeOfDay) {
+    enhancedPrompt += ` ${timeOfDay}.`;
+  }
+  
+  // Add activity if detected
+  if (activity) {
+    enhancedPrompt += ` ${activity}.`;
+  }
+  
+  // Add mood
+  enhancedPrompt += ` ${mood}.`;
+  
+  // Add user request context
   if (userRequest) {
-    enhancedPrompt += ` ${userRequest}.`;
+    enhancedPrompt += ` User requested: ${userRequest}`;
   }
   
   enhancedPrompt += ` High quality portrait photo, natural lighting, looking at camera.`;
-
+  
   // Add visual traits to ensure consistency
   if (avatar.visualTraits) {
     const traits = [];
@@ -1232,7 +1312,7 @@ export const generateSelfie = async (
   
   enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance with previous images.`;
   
-  const finalPrompt = `${enhancedPrompt} Recent context: ${context}`;
+  const finalPrompt = `${enhancedPrompt} Recent conversation context: ${context}`;
 
   // Primary: Server proxy (avoids CORS, uses configured APIs)
   try {
