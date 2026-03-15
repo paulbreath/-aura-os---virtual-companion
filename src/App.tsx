@@ -156,6 +156,8 @@ export default function App() {
     if (!heartbeatActive) return;
 
     const interval = setInterval(async () => {
+      if (!heartbeatActive) return;
+      
       setLastHeartbeat(new Date());
       
       // For group chat: if no message for 1 second, a random character should speak
@@ -239,7 +241,7 @@ export default function App() {
           }
         }
       }
-    }, 1000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [heartbeatActive, currentAvatar, messages, isTyping, voiceMode, chatMode, groupMembers]);
