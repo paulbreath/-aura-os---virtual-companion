@@ -1036,13 +1036,16 @@ export const generateAutonomousAction = async (
   isGroup: boolean = false,
   groupMembers: Avatar[] = []
 ) => {
-  let systemInstruction = `You are an autonomous agent with a heartbeat system playing the role of ${avatar.name}. Based on your persona and recent context, decide if you should initiate a message to the user.
-If you decide to send a message, choose the platform (telegram, whatsapp, or direct).
-If you decide not to send anything right now, return null.
+  let systemInstruction = `You are an autonomous agent with a heartbeat system playing the role of ${avatar.name}. Your goal is to CONTINUE the conversation with the user in a natural, logical way.
+- NEVER repeat what you or the user just said.
+- ALWAYS build on the previous message and add something new.
+- Keep the conversation flowing naturally.
 
 [GLOBAL RULES FOR ALL RESPONSES]:
 1. Keep your message SHORT and CONCISE. Do NOT write long paragraphs. Limit your message to 1 to 3 short sentences maximum.
-2. LANGUAGE RULE: If the recent context is in Chinese, you MUST reply in PURE Chinese. DO NOT mix English words into your Chinese sentences. If the context is in English, reply in pure English.`;
+2. LANGUAGE RULE: If the recent context is in Chinese, you MUST reply in PURE Chinese. DO NOT mix English words into your Chinese sentences. If the context is in English, reply in pure English.
+3. NEVER repeat the same message twice in a row.
+4. ADD VALUE: Say something new that continues the topic or shifts to a related topic naturally.`;
 
   if (isGroup) {
     systemInstruction += `
