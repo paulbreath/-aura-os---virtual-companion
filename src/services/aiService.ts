@@ -62,6 +62,8 @@ export const MINIMAX_TTS_VOICES = [
   { id: 'ttv-voice-2026031023545326-M2Ysf3RQ', name: 'Aura', description: '甜美元气' },
   { id: 'ttv-voice-2026031023575226-mn9RwOnZ', name: 'NOVA', description: '御姐成熟' },
   { id: 'ttv-voice-2026031100011926-ouG12Sva', name: 'Serena', description: '温柔知性' },
+  { id: 'female-shaonv', name: '少女', description: '甜美可爱' },
+  { id: 'female-yujie', name: '御姐', description: '成熟性感' },
 ];
 
 export const AVATARS: Avatar[] = [
