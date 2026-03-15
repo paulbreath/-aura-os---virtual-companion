@@ -198,13 +198,16 @@ export default function App() {
         }
       }
       
-      // Solo chat: if no user input for 1 second, character continues conversation
+      // Solo chat: if no user input for 2 seconds, character continues conversation
       if (chatMode === 'solo' && !isTyping && messages.length > 0) {
-        const lastMsg = messages[messages.length - 1];
-        const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
+        // Find the last user message (not model message)
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        if (!lastUserMsg) return;
         
-        // If more than 1 second has passed since last message
-        if (timeSinceLastMsg > 1000) {
+        const timeSinceLastUserMsg = Date.now() - new Date(lastUserMsg.timestamp).getTime();
+        
+        // If more than 2 seconds have passed since user's last message
+        if (timeSinceLastUserMsg > 2000) {
           const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
           
           try {
