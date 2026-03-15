@@ -1317,8 +1317,7 @@ export const generateSelfie = async (
           model: 'grok-2-image',
           prompt: finalPrompt,
           n: 1,
-          size: '1024x1024',
-          response_format: 'url',
+          aspect_ratio: '1:1'
         }),
       });
       
