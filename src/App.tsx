@@ -37,6 +37,7 @@ export default function App() {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [selectedMentionTarget, setSelectedMentionTarget] = useState<'all' | Avatar | null>(null);
   const [selfieMode, setSelfieMode] = useState(false);
+  const [lastGroupSpeakerTime, setLastGroupSpeakerTime] = useState<number>(0);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
     return Object.keys(AVAILABLE_MODELS).find(key =>
@@ -160,14 +161,23 @@ export default function App() {
       
       // Skip if heartbeat is disabled
       
-      // For group chat: if no message for 1 second, a random character should speak
+      // For group chat: if no message for a while, a random character should speak
       if (chatMode === 'group' && !isTyping && messages.length > 0) {
         const lastMsg = messages[messages.length - 1];
         const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
+        const timeSinceLastSpeaker = Date.now() - lastGroupSpeakerTime;
         
-        // If more than 3-5 seconds have passed since last message (random)
-        const randomDelay = 3000 + Math.random() * 2000;
-        if (timeSinceLastMsg > randomDelay) {
+        // If the last message was from an avatar, wait 2-4 seconds before another avatar responds
+        // This gives each avatar time to finish before another one speaks
+        const minDelayBetweenAvatars = lastGroupSpeakerTime > 0 ? 2500 + Math.random() * 1500 : 0;
+        
+        // Base delay: 3-5 seconds after last message
+        const baseDelay = 3000 + Math.random() * 2000;
+        
+        // Use the longer of the two delays
+        const requiredDelay = Math.max(baseDelay, minDelayBetweenAvatars);
+        
+        if (timeSinceLastMsg > requiredDelay) {
           // Pick a random avatar from group members
           const randomAvatar = groupMembers[Math.floor(Math.random() * groupMembers.length)];
           const recentContext = messages.slice(-5).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
@@ -199,6 +209,7 @@ export default function App() {
               };
 
               setMessages(prev => [...prev, newMsg]);
+              setLastGroupSpeakerTime(Date.now());
               if (audioData) playAudio(audioData);
             }
           } catch (e) {
@@ -392,6 +403,7 @@ export default function App() {
         if (audioData) await playAudio(audioData);
       } else {
         // Group Chat Logic
+        setLastGroupSpeakerTime(0); // Reset so avatars can respond to user
         let respondingAvatars: Avatar[] = [];
         const lowerInput = input.toLowerCase();
         
@@ -414,7 +426,8 @@ export default function App() {
 
         let currentMessages = [...messages, newUserMsg];
         
-        for (const avatar of respondingAvatars) {
+        for (let index = 0; index < respondingAvatars.length; index++) {
+          const avatar = respondingAvatars[index];
           setIsTyping(true);
           const aiResponse = await generateResponse(currentMessages, avatar, true, groupMembers);
           
@@ -436,12 +449,19 @@ export default function App() {
           };
 
           setMessages(prev => [...prev, newMsg]);
+          setLastGroupSpeakerTime(Date.now());
           currentMessages = [...currentMessages, newMsg];
+          
+          // Add delay between different avatars speaking for better rhythm
+          const delayBetweenAvatars = audioData ? 500 : 1500;
+          if (index < respondingAvatars.length - 1) {
+            await new Promise(r => setTimeout(r, delayBetweenAvatars));
+          }
           
           if (audioData) {
             await playAudio(audioData);
           } else {
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 500));
           }
         }
       }
