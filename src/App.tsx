@@ -156,9 +156,9 @@ export default function App() {
     if (!heartbeatActive) return;
 
     const interval = setInterval(async () => {
-      if (!heartbeatActive) return;
-      
       setLastHeartbeat(new Date());
+      
+      // Skip if heartbeat is disabled
       
       // For group chat: if no message for 1 second, a random character should speak
       if (chatMode === 'group' && !isTyping && messages.length > 0) {
@@ -205,12 +205,17 @@ export default function App() {
       if (chatMode === 'solo' && !isTyping && messages.length > 0) {
         // Find the last user message (not model message)
         const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-        if (!lastUserMsg) return;
+        if (!lastUserMsg) {
+          console.log('Solo auto-reply: no user message found');
+          return;
+        }
         
         const timeSinceLastUserMsg = Date.now() - new Date(lastUserMsg.timestamp).getTime();
+        console.log('Solo auto-reply: checking - time since last user msg:', timeSinceLastUserMsg);
         
         // If more than 2 seconds have passed since user's last message
         if (timeSinceLastUserMsg > 2000) {
+          console.log('Solo auto-reply: triggering...');
           const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
           
           try {
