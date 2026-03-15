@@ -1306,58 +1306,6 @@ export const generateSpeech = async (
 ): Promise<{ data: string; mimeType: string } | null> => {
   const inChina = await checkUserLocation();
   
-  // Try ElevenLabs if configured
-  const tryElevenLabs = async () => {
-    const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
-    if (!apiKey) return null;
-
-    const voiceMap: Record<string, string> = {
-      '9lHjugDhwqoxA5MhX0az': '9lHjugDhwqoxA5MhX0az',
-      'bhJUNIXWQQ94l8eI2VUf': 'bhJUNIXWQQ94l8eI2VUf',
-      'BqljjWyTnrioXPCNkCd4': 'BqljjWyTnrioXPCNkCd4',
-      'APSIkVZudNbPAwyPoeVO': 'APSIkVZudNbPAwyPoeVO',
-      'jqcCZkN6Knx8BJ5TBdYR': 'jqcCZkN6Knx8BJ5TBdYR'
-    };
-
-    const voiceId = voiceMap[voiceName];
-    if (!voiceId) {
-      console.log('🔊 ElevenLabs: Skipping - not an ElevenLabs voice');
-      return null;
-    }
-
-    try {
-      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'xi-api-key': apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75
-          }
-        })
-      });
-
-      if (!res.ok) throw new Error(`ElevenLabs API error: ${res.statusText}`);
-
-      const blob = await res.blob();
-      const buffer = await blob.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-
-      return { data: base64, mimeType: 'audio/mpeg' };
-    } catch (e) {
-      console.error("ElevenLabs failed:", e);
-      return null;
-    }
-  };
-
     // Try Azure TTS if configured
     const tryAzureTTS = async () => {
       const key = import.meta.env.VITE_AZURE_SPEECH_KEY;
@@ -1366,11 +1314,22 @@ export const generateSpeech = async (
 
       // Map voiceName to Azure voice names
       const voiceMap: Record<string, string> = {
+        // MiniMax voice IDs
+        'ttv-voice-2026031023545326-M2Ysf3RQ': 'zh-CN-XiaoxiaoNeural',
+        'ttv-voice-2026031023575226-mn9RwOnZ': 'zh-CN-YunxiNeural',
+        'ttv-voice-2026031100011926-ouG12Sva': 'zh-CN-XiaoyouNeural',
+        // Preset MiniMax voices
+        'female-shaonv': 'zh-CN-XiaoxiaoNeural',
+        'female-qn-qingse': 'zh-CN-XiaomoNeural',
+        'female-yujie': 'zh-CN-YunxiNeural',
+        'female-baiyang': 'zh-CN-XiaoxuanNeural',
+        'female-yina': 'zh-CN-YunyangNeural',
+        // Legacy ElevenLabs
         '9lHjugDhwqoxA5MhX0az': 'zh-CN-XiaoxiaoNeural',
-        'bhJUNIXWQQ94l8eI2VUf': 'zh-CN-XiaoyiNeural',
+        'bhJUNIXWQQ94l8eI2VUf': 'zh-CN-YunxiNeural',
         'BqljjWyTnrioXPCNkCd4': 'zh-CN-XiaomoNeural',
         'APSIkVZudNbPAwyPoeVO': 'zh-CN-XiaoxuanNeural',
-        'jqcCZkN6Knx8BJ5TBdYR': 'zh-CN-XiaoyiNeural'
+        'jqcCZkN6Knx8BJ5TBdYR': 'zh-CN-YunyangNeural'
       };
 
       // Detect language based on text content
@@ -1626,49 +1585,15 @@ export const generateSpeech = async (
       if (azureResponse) return azureResponse;
     }
 
-    // Try ElevenLabs as backup
-    if (import.meta.env.VITE_ELEVENLABS_API_KEY) {
-      const elResponse = await tryElevenLabs();
-      if (elResponse) return elResponse;
-    }
-
     // Try browser TTS as last resort (always available)
     const browserResult = await tryBrowserTTS();
     if (browserResult) {
       return browserResult;
     }
 
-   // Last resort: Try Gemini TTS if configured (only if not in China and ai exists)
-   if (!inChina && ai) {
-     try {
-       const response = await withRetry(() => ai.models.generateContent({
-         model: "gemini-2.5-flash-preview-tts",
-         contents: [{ parts: [{ text }] }],
-         config: {
-           responseModalities: ["AUDIO"],
-           speechConfig: {
-             voiceConfig: {
-               prebuiltVoiceConfig: { voiceName },
-             },
-           },
-         },
-       }));
-
-       const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-       if (inlineData) {
-         return {
-           data: inlineData.data,
-           mimeType: inlineData.mimeType
-         };
-       }
-     } catch (error: any) {
-       console.error("Gemini TTS failed:", error);
-     }
-   }
-
-   console.error("No TTS method available. Please configure an API key or use a supported browser.");
-   return null;
- };
+  console.error("No TTS method available.");
+  return null;
+};
 
 // Generate video using FAL.AI (e.g., for avatar video messages)
 export const generateVideo = async (
