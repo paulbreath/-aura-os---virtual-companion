@@ -691,44 +691,6 @@ export default function App() {
                )}
               </div>
 
-              {/* Voice Selector */}
-              <div className="relative">
-                <button 
-                  onClick={() => setShowVoiceMenu(!showVoiceMenu)}
-                  className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-zinc-800/50 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 transition-colors"
-                >
-                  <Mic size={14} className="text-pink-400" />
-                  <span className="hidden sm:inline">
-                    {MINIMAX_TTS_VOICES.find(v => v.id === getAvatarVoice(currentAvatar.id))?.name || '语音'}
-                  </span>
-                  <ChevronDown size={14} className="text-zinc-500" />
-                </button>
-                
-                {showVoiceMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                    <div className="p-2 space-y-1">
-                      {MINIMAX_TTS_VOICES.map(voice => (
-                        <button
-                          key={voice.id}
-                          onClick={() => {
-                            setSelectedVoice(voice.id);
-                            setShowVoiceMenu(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                            getAvatarVoice(currentAvatar.id) === voice.id
-                              ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
-                              : 'text-zinc-300 hover:bg-zinc-800'
-                          }`}
-                        >
-                          <div className="font-medium">{voice.name}</div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">{voice.description}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
             <button
               onClick={() => setVoiceMode(!voiceMode)}
               className={`transition-colors flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full ${

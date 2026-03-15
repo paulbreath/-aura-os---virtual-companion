@@ -194,14 +194,10 @@ export interface ModelConfig {
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
   'X.AI (Grok)': [
-    { provider: 'xai', modelId: 'grok-4-latest', name: 'Grok 4' },
-    { provider: 'xai', modelId: 'grok-2-1212', name: 'Grok 2' }
+    { provider: 'xai', modelId: 'grok-4-latest', name: 'Grok 4' }
   ],
   'DeepSeek': [
     { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' }
-  ],
-  'MiniMax (Free)': [
-    { provider: 'openrouter', modelId: 'openrouter/minimax/minimax-text-01', name: 'MiniMax Text 01' }
   ]
 };
 
