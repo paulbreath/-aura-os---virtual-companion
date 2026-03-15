@@ -84,9 +84,9 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Caucasian woman with blonde hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'aura-sweet',
      temperature: 0.9,
-     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ', // Aura voice
-     llmProvider: 'openrouter',
-     llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
+     llmProvider: 'xai',
+     llmModelId: 'grok-4-latest',
      visualTraits: {
        hair: 'blonde hair',
        eyes: 'brown eyes',
@@ -103,7 +103,7 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'nova-gamer',
      temperature: 0.95,
-     voiceName: 'ttv-voice-2026031023575226-mn9RwOnZ', // NOVA voice
+     voiceName: 'ttv-voice-2026031023575226-mn9RwOnZ',
      llmProvider: 'xai',
      llmModelId: 'grok-2-1212',
      visualTraits: {
@@ -122,9 +122,9 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Caucasian woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'serena-office',
      temperature: 0.7,
-     voiceName: 'ttv-voice-2026031100011926-ouG12Sva', // Serena voice
-     llmProvider: 'openrouter',
-     llmModelId: 'openrouter/anthropic/claude-3.5-sonnet',
+     voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
+     llmProvider: 'xai',
+     llmModelId: 'grok-2-1212',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -141,9 +141,9 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Asian woman with dark hair, smiling, looking at camera, natural light, high quality photo.',
      seed: 'atlas-queen',
      temperature: 0.6,
-     voiceName: 'ttv-voice-2026031100011926-ouG12Sva', // Serena voice (backup)
-     llmProvider: 'openrouter',
-     llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+     voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
+     llmProvider: 'xai',
+     llmModelId: 'grok-2-1212',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -160,9 +160,9 @@ export const AVATARS: Avatar[] = [
      imagePrompt: 'A selfie of a young Japanese woman with light brown hair, smiling, looking at camera, outdoors, natural light, high quality photo.',
      seed: 'orion-sport',
      temperature: 0.8,
-     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ', // Aura voice (backup)
-     llmProvider: 'openrouter',
-     llmModelId: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+     voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
+     llmProvider: 'xai',
+     llmModelId: 'grok-2-1212',
      visualTraits: {
        hair: 'light brown hair',
        eyes: 'brown eyes',
@@ -1312,13 +1312,24 @@ export const generateSelfie = async (
   
   enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance.`;
   
-  // Truncate prompt if too long (Pollinations has limits)
-  let finalPrompt = enhancedPrompt;
-  if (finalPrompt.length > 500) {
-    finalPrompt = finalPrompt.substring(0, 500);
+  const finalPrompt = enhancedPrompt;
+  
+  // Primary: Server proxy (uses X.AI Grok Imagine)
+  try {
+    const proxyRes = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: finalPrompt }),
+    });
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data.image) return data.image;
+    }
+  } catch (error) {
+    console.warn("Server proxy failed, will try fallbacks:", error);
   }
 
-  // Primary: Pollinations.ai (no CORS, no API key) - direct URL method
+  // Fallback: Pollinations.ai
   try {
     const seed = Date.now();
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
