@@ -152,6 +152,17 @@ export default function App() {
     }
   }, [currentAvatar]);
 
+  // Keyboard shortcut: Escape to toggle heartbeat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setHeartbeatActive(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
    // Heartbeat System
   useEffect(() => {
     if (!heartbeatActive) return;
@@ -814,15 +825,20 @@ export default function App() {
               {voiceMode ? <Volume2 size={16} /> : <VolumeX size={16} />}
               <span className="hidden sm:inline">{voiceMode ? 'Voice ON' : 'Voice OFF'}</span>
             </button>
-            {chatMode === 'solo' && (
+            {chatMode === 'solo' || chatMode === 'group' ? (
               <button 
                 onClick={() => setHeartbeatActive(!heartbeatActive)}
-                className="text-zinc-400 hover:text-zinc-200 transition-colors"
-                title="Toggle Heartbeat"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  heartbeatActive 
+                    ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' 
+                    : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'
+                }`}
+                title={heartbeatActive ? 'Click to pause auto-reply' : 'Click to resume auto-reply'}
               >
-                <Zap size={18} className={heartbeatActive ? "text-yellow-400" : ""} />
+                <Zap size={14} className={heartbeatActive ? "text-yellow-400" : ""} />
+                <span className="hidden sm:inline">{heartbeatActive ? 'Auto' : 'Paused'}</span>
               </button>
-            )}
+            ) : null}
           </div>
         </header>
 
