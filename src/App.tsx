@@ -174,7 +174,9 @@ export default function App() {
           setIsTyping(true);
           try {
             const action = await generateAutonomousAction(randomAvatar, recentContext, true, groupMembers);
-            if (action.shouldAct && action.message) {
+            // Support both {shouldAct: true} and {action: 'send'} formats
+            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message';
+            if (shouldAct && action.message) {
               let audioData: { data: string; mimeType: string } | undefined;
               if (voiceMode) {
                 const speech = await generateSpeech(action.message, getAvatarVoice(randomAvatar.id));
@@ -223,7 +225,9 @@ export default function App() {
           try {
             const action = await generateAutonomousAction(currentAvatar, recentContext, false, []);
             console.log('Solo auto-reply: action result:', action);
-            if (action.shouldAct && action.message) {
+            // Support both {shouldAct: true} and {action: 'send'} formats
+            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message';
+            if (shouldAct && action.message) {
               let audioData: { data: string; mimeType: string } | undefined;
               if (voiceMode) {
                 const speech = await generateSpeech(action.message, getAvatarVoice(currentAvatar.id));
