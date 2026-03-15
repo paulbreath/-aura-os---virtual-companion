@@ -176,8 +176,8 @@ export default function App() {
           try {
             const action = await generateAutonomousAction(randomAvatar, recentContext, true, groupMembers);
             console.log('Group auto-reply: action result:', action);
-            // Support both {shouldAct: true}, {action: 'send'}, and {response: '...'} formats
-            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message';
+            // Support {shouldAct: true}, {action: 'send'}, and {response: '...'} formats
+            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message' || !!action.response;
             const messageText = action.message || action.response;
             console.log('Group auto-reply: shouldAct:', shouldAct, 'message:', messageText);
             if (shouldAct && messageText) {
@@ -230,9 +230,10 @@ export default function App() {
           try {
             const action = await generateAutonomousAction(currentAvatar, recentContext, false, []);
             console.log('Solo auto-reply: action result:', action);
-            // Support both {shouldAct: true}, {action: 'send'}, and {response: '...'} formats
-            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message';
+            // Support {shouldAct: true}, {action: 'send'}, and {response: '...'} formats
+            const shouldAct = action.shouldAct === true || action.action === 'send' || action.action === 'send_message' || !!action.response;
             const messageText = action.message || action.response;
+            console.log('Solo auto-reply: shouldAct:', shouldAct, 'message:', messageText);
             if (shouldAct && messageText) {
               let audioData: { data: string; mimeType: string } | undefined;
               if (voiceMode) {
