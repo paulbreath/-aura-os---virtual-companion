@@ -165,11 +165,12 @@ export default function App() {
       if (chatMode === 'group' && !isTyping && messages.length > 0) {
         const lastMsg = messages[messages.length - 1];
         const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
-        const timeSinceLastSpeaker = Date.now() - lastGroupSpeakerTime;
+        const lastMsgIsFromAvatar = lastMsg.role === 'model';
         
-        // If the last message was from an avatar, wait 2-4 seconds before another avatar responds
-        // This gives each avatar time to finish before another one speaks
-        const minDelayBetweenAvatars = lastGroupSpeakerTime > 0 ? 2500 + Math.random() * 1500 : 0;
+        // If the last message was from an avatar, wait 2.5-4 seconds before another avatar responds
+        const minDelayBetweenAvatars = lastMsgIsFromAvatar && lastGroupSpeakerTime > 0 
+          ? 2500 + Math.random() * 1500 
+          : 0;
         
         // Base delay: 3-5 seconds after last message
         const baseDelay = 3000 + Math.random() * 2000;
@@ -276,7 +277,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [heartbeatActive, currentAvatar, messages, isTyping, voiceMode, chatMode, groupMembers]);
+  }, [heartbeatActive, currentAvatar, messages, isTyping, voiceMode, chatMode, groupMembers, avatarVoices]);
 
   const playAudio = async (audioData: { data: string; mimeType: string }) => {
     try {
