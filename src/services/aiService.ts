@@ -1531,8 +1531,7 @@ export const generateSpeech = async (
   };
 
     // Try MiniMax TTS if configured (China-friendly)
-    const tryMiniMaxTTS = async () => {
-      const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY;
+    const tryMiniMaxTTS = async (apiKey: string) => {
       if (!apiKey) {
         console.log('🔊 MiniMax TTS: No API key configured');
         return null;
@@ -1614,12 +1613,14 @@ export const generateSpeech = async (
     };
 
     // Try MiniMax TTS first (China-friendly)
-    const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY;
-    console.log('🔊 MiniMax TTS: API key exists:', !!apiKey, apiKey ? 'yes' : 'no');
+    const apiKey = import.meta.env.VITE_MINIMAX_TTS_KEY || (import.meta.env as any).MINIMAX_TTS_KEY;
+    console.log('🔊 MiniMax TTS: API key exists:', !!apiKey, apiKey ? 'yes (length: ' + apiKey.length + ')' : 'no');
     if (apiKey) {
       console.log('🔊 MiniMax TTS: Calling with voiceName:', voiceName);
-      const minimaxResponse = await tryMiniMaxTTS();
+      const minimaxResponse = await tryMiniMaxTTS(apiKey);
       if (minimaxResponse) return minimaxResponse;
+    } else {
+      console.warn('🔊 MiniMax TTS: No API key found. Please add VITE_MINIMAX_TTS_KEY to Zeabur environment variables');
     }
 
     // Try Azure TTS if configured
