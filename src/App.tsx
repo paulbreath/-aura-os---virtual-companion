@@ -157,7 +157,49 @@ export default function App() {
     const interval = setInterval(async () => {
       setLastHeartbeat(new Date());
       
-      if (Math.random() > 0.9 && !isTyping) {
+      // For group chat: if no message for 1 second, a random character should speak
+      if (chatMode === 'group' && !isTyping && messages.length > 0) {
+        const lastMsg = messages[messages.length - 1];
+        const timeSinceLastMsg = Date.now() - new Date(lastMsg.timestamp).getTime();
+        
+        // If more than 1 second has passed since last message
+        if (timeSinceLastMsg > 1000) {
+          // Pick a random avatar from group members
+          const randomAvatar = groupMembers[Math.floor(Math.random() * groupMembers.length)];
+          const recentContext = messages.slice(-5).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
+          
+          try {
+            const action = await generateAutonomousAction(randomAvatar, recentContext, true, groupMembers);
+            if (action.shouldAct && action.message) {
+              let audioData: { data: string; mimeType: string } | undefined;
+              if (voiceMode) {
+                const speech = await generateSpeech(action.message, getAvatarVoice(randomAvatar.id));
+                if (speech) audioData = speech;
+              }
+
+              const newMsg: Message = {
+                id: Date.now().toString(),
+                role: 'model',
+                content: action.message,
+                timestamp: new Date(),
+                source: action.platform as any || 'direct',
+                senderId: randomAvatar.id,
+                senderName: randomAvatar.name,
+                audioData
+              };
+
+              setMessages(prev => [...prev, newMsg]);
+              if (audioData) playAudio(audioData);
+            }
+          } catch (e) {
+            console.error("Group chat auto-reply error", e);
+          }
+          return; // Skip the solo heartbeat if we just did group chat
+        }
+      }
+      
+      // Solo chat heartbeat (less frequent)
+      if (chatMode === 'solo' && Math.random() > 0.9 && !isTyping) {
         const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
         
          try {
@@ -185,10 +227,10 @@ export default function App() {
           console.error("Heartbeat error", e);
         }
       }
-    }, 60000);
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [heartbeatActive, currentAvatar, messages, isTyping, voiceMode]);
+  }, [heartbeatActive, currentAvatar, messages, isTyping, voiceMode, chatMode, groupMembers]);
 
   const playAudio = async (audioData: { data: string; mimeType: string }) => {
     try {
