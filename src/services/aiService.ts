@@ -78,7 +78,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.9,
      voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
      llmProvider: 'xai',
-     llmModelId: 'grok-4-latest',
+     llmModelId: 'grok-4-1-fast',
      visualTraits: {
        hair: 'blonde hair',
        eyes: 'brown eyes',
@@ -97,7 +97,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.95,
      voiceName: 'ttv-voice-2026031023575226-mn9RwOnZ',
      llmProvider: 'xai',
-      llmModelId: 'grok-4-latest',
+      llmModelId: 'grok-4-1-fast',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -116,7 +116,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.7,
      voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
      llmProvider: 'xai',
-      llmModelId: 'grok-4-latest',
+      llmModelId: 'grok-4-1-fast',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -135,7 +135,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.6,
      voiceName: 'ttv-voice-2026031100011926-ouG12Sva',
      llmProvider: 'xai',
-      llmModelId: 'grok-4-latest',
+      llmModelId: 'grok-4-1-fast',
      visualTraits: {
        hair: 'dark hair',
        eyes: 'brown eyes',
@@ -154,7 +154,7 @@ export const AVATARS: Avatar[] = [
      temperature: 0.8,
      voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
      llmProvider: 'xai',
-      llmModelId: 'grok-4-latest',
+      llmModelId: 'grok-4-1-fast',
      visualTraits: {
        hair: 'light brown hair',
        eyes: 'brown eyes',
@@ -186,7 +186,7 @@ export interface ModelConfig {
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig[]> = {
   'X.AI (Grok)': [
-    { provider: 'xai', modelId: 'grok-4-latest', name: 'Grok 4' }
+    { provider: 'xai', modelId: 'grok-4-1-fast', name: 'Grok 4' }
   ],
   'DeepSeek': [
     { provider: 'deepseek', modelId: 'deepseek-chat', name: 'DeepSeek Chat' }
