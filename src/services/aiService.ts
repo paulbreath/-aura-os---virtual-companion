@@ -62,16 +62,6 @@ export const MINIMAX_TTS_VOICES = [
   { id: 'ttv-voice-2026031023545326-M2Ysf3RQ', name: 'Aura', description: '甜美元气' },
   { id: 'ttv-voice-2026031023575226-mn9RwOnZ', name: 'NOVA', description: '御姐成熟' },
   { id: 'ttv-voice-2026031100011926-ouG12Sva', name: 'Serena', description: '温柔知性' },
-  { id: 'female-shaonv', name: '少女', description: '甜美可爱' },
-  { id: 'female-qn-qingse', name: '青涩', description: '清新自然' },
-  { id: 'female-yujie', name: '御姐', description: '成熟性感' },
-  { id: 'female-baiyang', name: '白杨', description: '温柔知性' },
-  { id: 'female-yina', name: '伊娜', description: '优雅大方' },
-  { id: 'female-qn-jingying', name: '精英', description: '专业冷静' },
-  { id: 'female-xiaoqi', name: '小琪', description: '活泼俏皮' },
-  { id: 'female-langman', name: '浪漫', description: '柔情似水' },
-  { id: 'female-sitong', name: '思桐', description: '沉稳有力' },
-  { id: 'female-douyin', name: '逗音', description: '元气满满' },
 ];
 
 export const AVATARS: Avatar[] = [
