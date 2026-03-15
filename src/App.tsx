@@ -29,6 +29,11 @@ export default function App() {
   const [selectedVoice, setSelectedVoice] = useState<string>(() => {
     return localStorage.getItem('aura-selected-voice') || 'ttv-voice-2026031023545326-M2Ysf3RQ';
   });
+  const [avatarVoices, setAvatarVoices] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('aura-avatar-voices');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [showAvatarVoiceMenu, setShowAvatarVoiceMenu] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
     return Object.keys(AVAILABLE_MODELS).find(key =>
@@ -59,10 +64,20 @@ export default function App() {
     }
   }, [customAvatarImage]);
 
+  // Save avatar voices to localStorage
+  useEffect(() => {
+    localStorage.setItem('aura-avatar-voices', JSON.stringify(avatarVoices));
+  }, [avatarVoices]);
+
   // Save voice selection to localStorage
   useEffect(() => {
     localStorage.setItem('aura-selected-voice', selectedVoice);
   }, [selectedVoice]);
+
+  // Get voice for a specific avatar
+  const getAvatarVoice = (avatarId: string) => {
+    return avatarVoices[avatarId] || AVATARS.find(a => a.id === avatarId)?.voiceName || 'ttv-voice-2026031023545326-M2Ysf3RQ';
+  };
 
   const handleUploadAvatarImage = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,7 +134,7 @@ export default function App() {
         console.log('Testing Volcano Engine TTS...');
         const testText = `你好，这是${currentAvatar.name}的语音测试。`;
         try {
-          const result = await generateSpeech(testText, selectedVoice);
+          const result = await generateSpeech(testText, getAvatarVoice(currentAvatar.id));
           console.log('Volcengine TTS result:', result ? '✅ Success' : '❌ Failed', result);
           if (result && result.data) {
             const audio = new Audio(`data:audio/mpeg;base64,${result.data}`);
@@ -148,7 +163,7 @@ export default function App() {
            if (action.shouldAct && action.message) {
             let audioData = undefined;
             if (voiceMode) {
-              const speech = await generateSpeech(action.message, selectedVoice);
+              const speech = await generateSpeech(action.message, getAvatarVoice(currentAvatar.id));
               if (speech) audioData = speech;
             }
 
@@ -229,7 +244,7 @@ export default function App() {
         
         let audioData = undefined;
         if (voiceMode) {
-          const speech = await generateSpeech(aiResponse, selectedVoice);
+          const speech = await generateSpeech(aiResponse, getAvatarVoice(currentAvatar.id));
           if (speech) audioData = speech;
         }
 
@@ -276,7 +291,7 @@ export default function App() {
           
           let audioData = undefined;
           if (voiceMode) {
-            const speech = await generateSpeech(aiResponse, selectedVoice);
+            const speech = await generateSpeech(aiResponse, getAvatarVoice(currentAvatar.id));
             if (speech) audioData = speech;
           }
 
@@ -525,13 +540,45 @@ export default function App() {
                        className="w-10 h-10 rounded-full object-cover border border-zinc-700"
                        referrerPolicy="no-referrer"
                      />
-                     <div className="flex-1">
-                       <div className={`text-sm font-medium ${isSelected ? 'text-indigo-400' : 'text-zinc-200'}`}>
-                         {avatar.name}
-                       </div>
-                       <div className="text-xs text-zinc-500 truncate max-w-[180px]">{avatar.tagline}</div>
-                     </div>
-                     {chatMode === 'group' && (
+                      <div className="flex-1">
+                        <div className={`text-sm font-medium ${isSelected ? 'text-indigo-400' : 'text-zinc-200'}`}>
+                          {avatar.name}
+                        </div>
+                        <div className="text-xs text-zinc-500 truncate max-w-[180px] flex items-center gap-1">
+                          {MINIMAX_TTS_VOICES.find(v => v.id === getAvatarVoice(avatar.id))?.name || 'Voice'}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAvatarVoiceMenu(showAvatarVoiceMenu === avatar.id ? null : avatar.id);
+                            }}
+                            className="text-zinc-500 hover:text-pink-400"
+                          >
+                            <Mic size={10} />
+                          </button>
+                        </div>
+                      </div>
+                      {showAvatarVoiceMenu === avatar.id && (
+                        <div className="absolute left-12 mt-2 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+                          {MINIMAX_TTS_VOICES.map(voice => (
+                            <button
+                              key={voice.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAvatarVoices({...avatarVoices, [avatar.id]: voice.id});
+                                setShowAvatarVoiceMenu(null);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs rounded transition-colors ${
+                                getAvatarVoice(avatar.id) === voice.id
+                                  ? 'bg-pink-500/20 text-pink-400'
+                                  : 'text-zinc-300 hover:bg-zinc-800'
+                              }`}
+                            >
+                              {voice.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {chatMode === 'group' && (
                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-600'}`}>
                          {isSelected && <div className="w-2 h-2 bg-white rounded-sm" />}
                        </div>
@@ -652,7 +699,7 @@ export default function App() {
                 >
                   <Mic size={14} className="text-pink-400" />
                   <span className="hidden sm:inline">
-                    {MINIMAX_TTS_VOICES.find(v => v.id === selectedVoice)?.name || '语音'}
+                    {MINIMAX_TTS_VOICES.find(v => v.id === getAvatarVoice(currentAvatar.id))?.name || '语音'}
                   </span>
                   <ChevronDown size={14} className="text-zinc-500" />
                 </button>
@@ -668,7 +715,7 @@ export default function App() {
                             setShowVoiceMenu(false);
                           }}
                           className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                            selectedVoice === voice.id
+                            getAvatarVoice(currentAvatar.id) === voice.id
                               ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
                               : 'text-zinc-300 hover:bg-zinc-800'
                           }`}
