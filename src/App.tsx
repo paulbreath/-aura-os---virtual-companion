@@ -171,6 +171,7 @@ export default function App() {
           const randomAvatar = groupMembers[Math.floor(Math.random() * groupMembers.length)];
           const recentContext = messages.slice(-5).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
           
+          setIsTyping(true);
           try {
             const action = await generateAutonomousAction(randomAvatar, recentContext, true, groupMembers);
             if (action.shouldAct && action.message) {
@@ -196,6 +197,8 @@ export default function App() {
             }
           } catch (e) {
             console.error("Group chat auto-reply error", e);
+          } finally {
+            setIsTyping(false);
           }
           return; // Skip the solo heartbeat if we just did group chat
         }
@@ -206,16 +209,14 @@ export default function App() {
         // Find the last user message (not model message)
         const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
         if (!lastUserMsg) {
-          console.log('Solo auto-reply: no user message found');
           return;
         }
         
         const timeSinceLastUserMsg = Date.now() - new Date(lastUserMsg.timestamp).getTime();
-        console.log('Solo auto-reply: checking - time since last user msg:', timeSinceLastUserMsg);
         
         // If more than 2 seconds have passed since user's last message
         if (timeSinceLastUserMsg > 2000) {
-          console.log('Solo auto-reply: triggering...');
+          setIsTyping(true);
           const recentContext = messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
           
           try {
@@ -243,6 +244,8 @@ export default function App() {
             }
           } catch (e) {
             console.error("Solo chat auto-reply error", e);
+          } finally {
+            setIsTyping(false);
           }
         }
       }
