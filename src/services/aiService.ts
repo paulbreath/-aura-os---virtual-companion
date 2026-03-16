@@ -879,10 +879,12 @@ export const generateResponse = async (
 - You can respond to:
   * The user (talk directly to them)
   * Any partner who spoke recently (react to their message)
-- EXTREMELY IMPORTANT: You MUST NEVER impersonate another partner. Do NOT use any other person's name or prefix your message with "[OtherName]:".
-- Your responses must NEVER start with "[YourName]:" either. The system will automatically attribute your message to you.
+  * You can ALSO address/mention another partner directly (e.g., "@Nova" or "Nova" or "亲爱的NOVA") - this is ENCOURAGED to make conversations more dynamic!
+- WHEN ADDRESSING ANOTHER PARTNER: Use YOUR OWN voice/style/personality. For example, if you are Aura (sweet/caring) addressing Nova, say "Nova宝贝～" in YOUR sweet tone, not Nova's tone.
+- NEVER impersonate another partner. Keep YOUR personality when speaking to others.
+- Your responses must NEVER start with "[YourName]:" or "[OtherName]:". The system will automatically attribute your message to you.
 - Simply write your message content naturally, as if you're speaking in the chat.
-- If responding to someone, you can address them by name naturally in your sentence, e.g., "Nova, that's so sweet!" but NOT " [Nova]: 哼..."
+- You can mention/address others naturally, e.g., "Nova, that's so sweet!" or "亲爱的Atlas～" or "@Serena"
 - Keep responses short (1-3 sentences).`;
     }
 
@@ -1055,7 +1057,9 @@ export const generateAutonomousAction = async (
 - You can respond to:
   * The user's last message (if any)
   * Any partner's last message (if someone else spoke recently)
-- You cannot speak on behalf of other partners.
+  * You can ALSO address/mention another partner (@Nova, "亲爱的Atlas", etc.) - this is ENCOURAGED!
+- When addressing another partner, use YOUR OWN voice/personality (not theirs). For example, if you are Aura talking to Nova, use Aura's sweet/caring tone.
+- You cannot speak on behalf of other partners (don't pretend to BE them).
 - You can initiate conversation even if the user hasn't spoken recently (e.g., to flirt, check in, or react to another partner's message).
 - The chat history shows messages with [Sender]: message format.
 - Return shouldAct: true if you want to send message now.
