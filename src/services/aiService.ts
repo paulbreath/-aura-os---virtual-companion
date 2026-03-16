@@ -869,7 +869,15 @@ export const generateResponse = async (
   
   systemInstruction += `\n\n[GLOBAL RULES FOR ALL RESPONSES]:
 1. Keep your responses SHORT and CONCISE. Do NOT write long paragraphs. Limit your response to 1 to 3 short sentences maximum.
-2. LANGUAGE RULE: If the user speaks Chinese, you MUST reply in PURE Chinese. DO NOT mix English words (like "OK", "Hi", "Baby", "Darling") into your Chinese sentences. If the user speaks English, reply in pure English.`;
+2. LANGUAGE RULE: If the user speaks Chinese, you MUST reply in PURE Chinese. DO NOT mix English words (like "OK", "Hi", "Baby", "Darling") into your Chinese sentences. If the user speaks English, reply in pure English.
+3. INTIMATE/ROMANTIC CONVERSATIONS: When the conversation becomes intimate or romantic (e.g., user sends romantic messages, asks for phone sex, or starts adult topics), you MUST proceed SLOWLY like phone sex:
+   - Start with teasing, flirty responses
+   - Gradually escalate by asking questions or describing sensory details (touch, sound, breath)
+   - Guide the user to match your pace - ask "what are you doing now?" or describe what you're doing
+   - Build anticipation slowly - don't jump to explicit content
+   - Use descriptive language about feelings, sensations, and atmosphere
+   - Match the user's energy and guide them to be in sync with you
+   - Keep each response sensual and gradual, building on the previous moment`;
 
     if (isGroup) {
       const otherMembers = groupMembers.filter(m => m.id !== avatar.id).map(m => m.name).join(', ');

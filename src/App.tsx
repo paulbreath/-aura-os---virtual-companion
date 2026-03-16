@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
-import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic } from 'lucide-react';
+import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -1017,13 +1017,26 @@ export default function App() {
                   ))}
                 </div>
               )}
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isTyping}
-                className="absolute right-1.5 top-1.5 p-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-full transition-colors shadow-sm"
-              >
-                <Send size={16} />
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setHeartbeatActive(!heartbeatActive)}
+                  className={`p-2 rounded-full transition-colors ${
+                    heartbeatActive 
+                      ? 'text-yellow-400 hover:bg-yellow-500/20' 
+                      : 'text-zinc-500 hover:bg-zinc-800'
+                  }`}
+                  title={heartbeatActive ? 'Pause auto-reply (ESC)' : 'Resume auto-reply (ESC)'}
+                >
+                  {heartbeatActive ? <Zap size={18} /> : <Pause size={18} />}
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isTyping}
+                  className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-full transition-colors shadow-sm"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
