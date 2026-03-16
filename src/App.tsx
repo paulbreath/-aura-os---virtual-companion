@@ -1017,17 +1017,17 @@ export default function App() {
                   ))}
                 </div>
               )}
-              <div className="flex gap-1">
+              <div className="absolute right-1.5 top-1.5 flex gap-1">
                 <button
                   onClick={() => setHeartbeatActive(!heartbeatActive)}
                   className={`p-2 rounded-full transition-colors ${
                     heartbeatActive 
                       ? 'text-yellow-400 hover:bg-yellow-500/20' 
-                      : 'text-zinc-500 hover:bg-zinc-800'
+                      : 'text-zinc-500 hover:bg-zinc-700'
                   }`}
                   title={heartbeatActive ? 'Pause auto-reply (ESC)' : 'Resume auto-reply (ESC)'}
                 >
-                  {heartbeatActive ? <Zap size={18} /> : <Pause size={18} />}
+                  <Pause size={18} />
                 </button>
                 <button
                   onClick={handleSend}
