@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { spicyAPI } from "./spicyAPIService";
 
 // Extend ImportMeta for Vite env variables
 interface ImportMetaEnv {
@@ -16,6 +17,8 @@ interface ImportMetaEnv {
   readonly VITE_AZURE_SPEECH_KEY?: string;
   readonly VITE_AZURE_SPEECH_REGION?: string;
   readonly VITE_MINIMAX_TTS_KEY?: string;
+  readonly VITE_SPICY_API_KEY?: string;
+  readonly VITE_SPICY_CLIENT_ID?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -1922,13 +1925,66 @@ export const generateVideo = async (
   context: string,
   mood: 'happy' | 'flirty' | 'casual' = 'flirty'
 ): Promise<string | null> => {
-  const prompt = `${avatar.imagePrompt} A short 5-second video clip, ${mood} mood, looking at camera, subtle movement, high quality, cinematic. Context: ${context}`;
+  const prompt = `${avatar.imagePrompt} A short video clip, ${mood} mood, looking at camera, subtle movement, high quality, cinematic. Context: ${context}`;
 
+  // Primary: SpicyAPI (adult content specialized)
+  if (spicyAPI.isConfigured()) {
+    try {
+      console.log('🎬 Trying SpicyAPI for video generation...');
+      const videoUrl = await spicyAPI.generateVideoAndWait({
+        prompt: prompt,
+        negative_prompt: 'clothing, censoring, mosaic, blur, ugly, deformed, low quality',
+        width: 512,
+        height: 512,
+        num_frames: 16,
+        guidance_scale: 7.5,
+      });
+      
+      if (videoUrl) {
+        console.log('✅ SpicyAPI video generated:', videoUrl);
+        return videoUrl;
+      }
+    } catch (error) {
+      console.error('SpicyAPI video generation failed:', error);
+    }
+  }
+
+  // Fallback: FAL
   try {
+    console.log('🎬 Trying FAL for video generation...');
     const videoUrl = await callFalVideo(prompt);
     return videoUrl;
   } catch (error) {
     console.error("Error generating video:", error);
+    return null;
+  }
+};
+
+// Generate adult content video
+export const generateAdultVideo = async (
+  content: string,
+  options: {
+    quality?: 'low' | 'medium' | 'high';
+    duration?: 'short' | 'medium' | 'long';
+  } = {}
+): Promise<string | null> => {
+  if (!spicyAPI.isConfigured()) {
+    console.warn('SpicyAPI not configured for adult video generation');
+    return null;
+  }
+
+  try {
+    console.log('🔞 Generating adult content video...');
+    const videoUrl = await spicyAPI.generateAdultVideo(content, options);
+    
+    if (videoUrl) {
+      console.log('✅ Adult video generated:', videoUrl);
+      return videoUrl;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Adult video generation failed:', error);
     return null;
   }
 };
