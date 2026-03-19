@@ -1672,7 +1672,8 @@ export const generateSpeech = async (
 
     // Try ModelsLab TTS as fallback
     const tryModelsLabTTS = async () => {
-      const apiKey = '0xNDQiDH8USqAeMDh8PMYYykPgmXozzWhqXbr57QIoUNajGlvsO7h1KjcrgD';
+      const apiKey = import.meta.env.VITE_MODELSLAB_API_KEY;
+      if (!apiKey) return null;
       
       // Map voice IDs to ModelsLab voice names
       const voiceMap: Record<string, string> = {
