@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
+import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext } from './services/memoryService';
 import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -60,6 +61,8 @@ export default function App() {
       return null;
     }
   });
+  const [userMemory, setUserMemory] = useState<UserMemory>(() => loadUserMemory());
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
 
   // Save custom avatar image to localStorage
   useEffect(() => {
@@ -72,6 +75,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('aura-avatar-voices', JSON.stringify(avatarVoices));
   }, [avatarVoices]);
+
+  // Save user memory to localStorage
+  useEffect(() => {
+    saveUserMemory(userMemory);
+  }, [userMemory]);
 
   // Save voice selection to localStorage
   useEffect(() => {
@@ -390,9 +398,22 @@ export default function App() {
     setInput('');
     setIsTyping(true);
 
+    // Extract and save memory from user message
+    const content = input.toLowerCase();
+    if (content.includes('我喜欢') || content.includes('我叫') || content.includes('我的名字是')) {
+      setUserMemory(prev => addMemory(prev, input, 'preference', 8, ['preference']));
+    } else if (content.includes('开心') || content.includes('难过') || content.includes('生气')) {
+      setUserMemory(prev => addMemory(prev, input, 'emotion', 7, ['emotion']));
+    } else if (content.includes('今天') || content.includes('昨天') || content.includes('明天')) {
+      setUserMemory(prev => addMemory(prev, input, 'event', 5, ['event']));
+    } else {
+      setUserMemory(prev => addMemory(prev, input, 'conversation', 3, ['conversation']));
+    }
+
     try {
       if (chatMode === 'solo') {
-        const aiResponse = await generateResponse([...messages, newUserMsg], currentAvatar);
+        const memoryContext = generateMemoryContext(userMemory);
+        const aiResponse = await generateResponse([...messages, newUserMsg], currentAvatar, false, [], memoryContext);
         
         let audioData = undefined;
         if (voiceMode) {
@@ -441,7 +462,8 @@ export default function App() {
         for (let index = 0; index < respondingAvatars.length; index++) {
           const avatar = respondingAvatars[index];
           setIsTyping(true);
-          const aiResponse = await generateResponse(currentMessages, avatar, true, groupMembers);
+          const memoryContext = generateMemoryContext(userMemory);
+          const aiResponse = await generateResponse(currentMessages, avatar, true, groupMembers, memoryContext);
           
           let audioData = undefined;
           if (voiceMode) {
@@ -825,7 +847,22 @@ export default function App() {
               {voiceMode ? <Volume2 size={16} /> : <VolumeX size={16} />}
               <span className="hidden sm:inline">{voiceMode ? 'Voice ON' : 'Voice OFF'}</span>
             </button>
-            {chatMode === 'solo' || chatMode === 'group' ? (
+             {/* Memory Button */}
+             <button 
+               onClick={() => setShowMemoryPanel(!showMemoryPanel)}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                 showMemoryPanel 
+                   ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30' 
+                   : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700'
+               }`}
+               title="View Memory"
+             >
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                 <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+               </svg>
+               <span className="hidden sm:inline">Memory</span>
+             </button>
+             {chatMode === 'solo' || chatMode === 'group' ? (
               <button 
                 onClick={() => setHeartbeatActive(!heartbeatActive)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
@@ -927,6 +964,79 @@ export default function App() {
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Memory Panel */}
+        <AnimatePresence>
+          {showMemoryPanel && (
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="absolute right-0 top-16 bottom-0 w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-800 z-40 overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-200">Memory & Preferences</h3>
+                <button 
+                  onClick={() => setShowMemoryPanel(false)}
+                  className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                  <X size={16} className="text-zinc-400" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* User Preferences */}
+                <div className="bg-zinc-800/50 rounded-lg p-3">
+                  <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Preferences</h4>
+                  {userMemory.preferences.name && (
+                    <div className="text-sm text-zinc-200 mb-1">Name: {userMemory.preferences.name}</div>
+                  )}
+                  {userMemory.preferences.interests && userMemory.preferences.interests.length > 0 && (
+                    <div className="text-sm text-zinc-200 mb-1">
+                      Interests: {userMemory.preferences.interests.join(', ')}
+                    </div>
+                  )}
+                  {!userMemory.preferences.name && (!userMemory.preferences.interests || userMemory.preferences.interests.length === 0) && (
+                    <div className="text-xs text-zinc-500">No preferences set yet</div>
+                  )}
+                </div>
+                
+                {/* Recent Memories */}
+                <div className="bg-zinc-800/50 rounded-lg p-3">
+                  <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Recent Memories</h4>
+                  {userMemory.memories.slice(-5).reverse().map(memory => (
+                    <div key={memory.id} className="text-sm text-zinc-300 mb-2 pb-2 border-b border-zinc-700/50 last:border-0">
+                      <div className="text-xs text-zinc-500 mb-1">
+                        {new Date(memory.timestamp).toLocaleString()} • {memory.type}
+                      </div>
+                      <div className="line-clamp-2">{memory.content}</div>
+                    </div>
+                  ))}
+                  {userMemory.memories.length === 0 && (
+                    <div className="text-xs text-zinc-500">No memories yet</div>
+                  )}
+                </div>
+
+                {/* Clear Memory */}
+                <button
+                  onClick={() => {
+                    if (confirm('Clear all memories?')) {
+                      setUserMemory({
+                        userId: 'default',
+                        memories: [],
+                        preferences: {},
+                        emotionalTrends: []
+                      });
+                    }
+                  }}
+                  className="w-full mt-4 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors"
+                >
+                  Clear All Memories
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Input Area */}
         <div className="p-4 bg-zinc-900/50 backdrop-blur-md border-t border-zinc-800/80">
