@@ -1319,51 +1319,6 @@ export const generateSelfie = async (
   
   const finalPrompt = enhancedPrompt;
   
-  // Try ModelsLab API (supports NSFW content)
-  const modelsLabKey = import.meta.env.VITE_MODELSLAB_API_KEY;
-  if (modelsLabKey) {
-    try {
-      console.log('Trying ModelsLab API...');
-      const res = await fetch('https://modelslab.com/api/v6/images/text2img', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          key: modelsLabKey,
-          prompt: finalPrompt,
-          negative_prompt: 'nsfw, child, underage, ugly, low quality, blurry',
-          width: '512',
-          height: '512',
-          safety_checker: 'no',
-          samples: '1',
-          num_inference_steps: '25',
-          safety_checker_type: 'blacklist',
-          enhance_prompt: 'yes',
-          guidance_scale: 7.5,
-          base64: 'no',
-          model_id: 'sdxl'
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.future_links && data.future_links[0]) {
-          const imageUrl = data.future_links[0];
-          const imgRes = await fetch(imageUrl);
-          const blob = await imgRes.blob();
-          const buffer = await blob.arrayBuffer();
-          const base64 = btoa(
-            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
-          return `data:image/jpeg;base64,${base64}`;
-        }
-      }
-    } catch (error) {
-      console.error('ModelsLab API failed:', error);
-    }
-  }
-  
   // Primary: X.AI Grok 2 Image (direct API call)
   const xaiKey = import.meta.env.VITE_XAI_API_KEY;
   if (xaiKey) {
@@ -1399,7 +1354,52 @@ export const generateSelfie = async (
     }
   }
 
-  // Fallback: Pollinations.ai
+  // Fallback: ModelsLab NSFW API (supports adult content)
+  const modelsLabKey = import.meta.env.VITE_MODELSLAB_API_KEY;
+  if (modelsLabKey) {
+    try {
+      console.log('Trying ModelsLab NSFW API...');
+      const res = await fetch('https://modelslab.com/api/v6/images/text2img', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: modelsLabKey,
+          prompt: finalPrompt,
+          negative_prompt: 'child, underage, ugly, low quality, blurry',
+          width: '512',
+          height: '512',
+          safety_checker: 'no',
+          samples: '1',
+          num_inference_steps: '25',
+          safety_checker_type: 'blacklist',
+          enhance_prompt: 'yes',
+          guidance_scale: 7.5,
+          base64: 'no',
+          model_id: 'nsfw'
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.future_links && data.future_links[0]) {
+          const imageUrl = data.future_links[0];
+          const imgRes = await fetch(imageUrl);
+          const blob = await imgRes.blob();
+          const buffer = await blob.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          return `data:image/jpeg;base64,${base64}`;
+        }
+      }
+    } catch (error) {
+      console.error('ModelsLab NSFW API failed:', error);
+    }
+  }
+  
+  // Last Fallback: Pollinations.ai
   try {
     const seed = Date.now();
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
