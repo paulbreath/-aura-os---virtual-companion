@@ -1670,6 +1670,81 @@ export const generateSpeech = async (
       if (azureResponse) return azureResponse;
     }
 
+    // Try ModelsLab TTS as fallback
+    const tryModelsLabTTS = async () => {
+      const apiKey = '0xNDQiDH8USqAeMDh8PMYYykPgmXozzWhqXbr57QIoUNajGlvsO7h1KjcrgD';
+      
+      // Map voice IDs to ModelsLab voice names
+      const voiceMap: Record<string, string> = {
+        'ttv-voice-2026031023545326-M2Ysf3RQ': 'alloy', // Aura
+        'ttv-voice-2026031023575226-mn9RwOnZ': 'onyx', // NOVA
+        'ttv-voice-2026031100011926-ouG12Sva': 'nova', // Serena
+        'female-shaonv': 'shimmer',
+        'female-yujie': 'alloy',
+        'female-baiyang': 'nova',
+        'female-yina': 'onyx',
+        'female-qn-jingying': 'alloy',
+        'female-xiaoqi': 'shimmer',
+        'female-langman': 'nova',
+        'female-sitong': 'shimmer',
+        'female-douyin': 'shimmer'
+      };
+      
+      const voiceId = voiceMap[voiceName] || 'shimmer';
+      
+      try {
+        const res = await fetch('https://modelslab.com/api/v6/voice/text_to_speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            prompt: text,
+            voice_id: voiceId,
+            language: 'american english',
+            speed: '0.9',
+            key: apiKey
+          })
+        });
+
+        if (!res.ok) {
+          console.error('ModelsLab TTS error:', res.status);
+          return null;
+        }
+
+        const data = await res.json();
+        console.log('🔊 ModelsLab TTS response:', data.status);
+        
+        if (data.status === 'processing' && data.future_links && data.future_links[0]) {
+          const audioUrl = data.future_links[0];
+          const audioRes = await fetch(audioUrl);
+          const blob = await audioRes.blob();
+          const buffer = await blob.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          return { data: base64, mimeType: 'audio/wav' };
+        }
+        
+        if (data.status === 'success' && data.output && data.output[0]) {
+          return { data: data.output[0], mimeType: 'audio/wav' };
+        }
+        
+        return null;
+      } catch (e) {
+        console.error("ModelsLab TTS failed:", e);
+        return null;
+      }
+    };
+
+    // Try ModelsLab TTS
+    try {
+      const modelsLabResponse = await tryModelsLabTTS();
+      if (modelsLabResponse) return modelsLabResponse;
+    } catch (e) {
+      console.error("ModelsLab TTS attempt failed:", e);
+    }
+
     // Try browser TTS as last resort (always available)
     const browserResult = await tryBrowserTTS();
     if (browserResult) {
