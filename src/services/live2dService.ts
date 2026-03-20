@@ -2,7 +2,16 @@
 // Documentation: https://github.com/guansss/pixi-live2d-display
 
 import * as PIXI from 'pixi.js';
-import { Live2DModel } from 'pixi-live2d-display';
+import { Live2DModel, Cubism4ModelSettings } from 'pixi-live2d-display';
+
+// 配置 Cubism Core 运行时路径
+// 注意：需要在 public 目录下放置 Cubism Core 文件
+// 从 https://live2d.github.io/cubism-core/ 下载
+declare global {
+  interface Window {
+    Live2DCubismCore: any;
+  }
+}
 
 // Live2D 表情/动作映射
 export interface Live2DExpression {
@@ -93,7 +102,10 @@ class Live2DService {
         this.model.destroy();
       }
 
+      console.log('🔄 Loading Live2D model:', modelPath);
+      
       // 加载新模型
+      // 注意：pixi-live2d-display 会自动检测模型版本
       this.model = await Live2DModel.from(modelPath, {
         autoInteract: true,
       });
