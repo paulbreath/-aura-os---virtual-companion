@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
 import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext } from './services/memoryService';
-import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause } from 'lucide-react';
+import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import AvatarCreator from './components/AvatarCreator';
 
 export default function App() {
   const [chatMode, setChatMode] = useState<'solo' | 'group'>('solo');
@@ -38,6 +39,7 @@ export default function App() {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [selectedMentionTarget, setSelectedMentionTarget] = useState<'all' | Avatar | null>(null);
   const [selfieMode, setSelfieMode] = useState(false);
+  const [showAvatarCreator, setShowAvatarCreator] = useState(false);
   const [lastGroupSpeakerTime, setLastGroupSpeakerTime] = useState<number>(0);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
@@ -776,8 +778,17 @@ export default function App() {
               </p>
             </div>
           </div>
-           <div className="flex items-center gap-4">
-             {/* Model Selector - Two Level Dropdown */}
+            <div className="flex items-center gap-4">
+              {/* Create Avatar Button */}
+              <button
+                onClick={() => setShowAvatarCreator(true)}
+                className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:from-pink-600 hover:to-purple-600 transition-all"
+              >
+                <Plus size={14} />
+                <span className="hidden sm:inline">创建角色</span>
+              </button>
+
+              {/* Model Selector - Two Level Dropdown */}
              <div className="relative">
                <button 
                  onClick={() => {
@@ -1151,6 +1162,20 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Avatar Creator Modal */}
+      <AnimatePresence>
+        {showAvatarCreator && (
+          <AvatarCreator
+            onComplete={(customization, imageUrl) => {
+              console.log('Avatar created:', customization, imageUrl);
+              // TODO: Save avatar and update state
+              setShowAvatarCreator(false);
+            }}
+            onCancel={() => setShowAvatarCreator(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
