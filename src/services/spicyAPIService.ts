@@ -1,7 +1,7 @@
 // SpicyAPI Service - Adult Content Video Generation
 // Documentation: https://www.spicyapi.com/docs
 
-const SPICY_API_BASE = 'https://api.spicyapi.com';
+const SPICY_API_BASE = 'https://api.spicyapi.com/v1';
 
 interface SpicyAPIConfig {
   apiKey: string;
@@ -66,7 +66,7 @@ class SpicyAPIService {
     }
 
     try {
-      const response = await fetch(`${SPICY_API_BASE}/v1/video/generate`, {
+      const response = await fetch(`${SPICY_API_BASE}/text-to-video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ class SpicyAPIService {
     }
 
     try {
-      const response = await fetch(`${SPICY_API_BASE}/v1/image/generate`, {
+      const response = await fetch(`${SPICY_API_BASE}/text-to-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +148,7 @@ class SpicyAPIService {
     }
 
     try {
-      const response = await fetch(`${SPICY_API_BASE}/v1/generation/${generationId}`, {
+      const response = await fetch(`${SPICY_API_BASE}/status/${generationId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.config.apiKey}`,
