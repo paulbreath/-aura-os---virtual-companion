@@ -4,6 +4,7 @@ import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemor
 import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AvatarCreator from './components/AvatarCreator';
+import Live2DCharacter from './components/Live2DCharacter';
 
 export default function App() {
   const [chatMode, setChatMode] = useState<'solo' | 'group'>('solo');
@@ -65,6 +66,8 @@ export default function App() {
   });
   const [userMemory, setUserMemory] = useState<UserMemory>(() => loadUserMemory());
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [showLive2D, setShowLive2D] = useState(false);
+  const [live2DModelPath, setLive2DModelPath] = useState('/models/default.model3.json');
 
   // Save custom avatar image to localStorage
   useEffect(() => {
@@ -788,6 +791,19 @@ export default function App() {
                 <span className="hidden sm:inline">创建角色</span>
               </button>
 
+              {/* Live2D Toggle Button */}
+              <button
+                onClick={() => setShowLive2D(!showLive2D)}
+                className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
+                  showLive2D 
+                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                    : 'bg-zinc-800/50 text-zinc-300 border border-zinc-700 hover:bg-zinc-700'
+                }`}
+              >
+                <Zap size={14} />
+                <span className="hidden sm:inline">Live2D</span>
+              </button>
+
               {/* Model Selector - Two Level Dropdown */}
              <div className="relative">
                <button 
@@ -1044,6 +1060,40 @@ export default function App() {
                 >
                   Clear All Memories
                 </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Live2D Panel */}
+        <AnimatePresence>
+          {showLive2D && (
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="absolute left-0 top-16 bottom-0 w-80 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-40 overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-200">Live2D 动态角色</h3>
+                <button 
+                  onClick={() => setShowLive2D(false)}
+                  className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                  <X size={16} className="text-zinc-400" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <Live2DCharacter 
+                  modelPath={live2DModelPath}
+                  onExpressionChange={(expression) => {
+                    console.log('Expression changed:', expression);
+                  }}
+                  onClothingChange={(state) => {
+                    console.log('Clothing changed:', state);
+                  }}
+                />
               </div>
             </motion.div>
           )}
