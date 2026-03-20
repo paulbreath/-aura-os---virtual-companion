@@ -5,6 +5,7 @@ import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone
 import { motion, AnimatePresence } from 'motion/react';
 import AvatarCreator from './components/AvatarCreator';
 import Live2DCharacter from './components/Live2DCharacter';
+import VoiceChat from './components/VoiceChat';
 
 export default function App() {
   const [chatMode, setChatMode] = useState<'solo' | 'group'>('solo');
@@ -68,6 +69,8 @@ export default function App() {
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [showLive2D, setShowLive2D] = useState(false);
   const [live2DModelPath, setLive2DModelPath] = useState('/models/default.model3.json');
+  const [showVoiceChat, setShowVoiceChat] = useState(false);
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
 
   // Save custom avatar image to localStorage
   useEffect(() => {
@@ -804,6 +807,19 @@ export default function App() {
                 <span className="hidden sm:inline">Live2D</span>
               </button>
 
+              {/* Voice Chat Toggle Button */}
+              <button
+                onClick={() => setShowVoiceChat(!showVoiceChat)}
+                className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
+                  showVoiceChat 
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                    : 'bg-zinc-800/50 text-zinc-300 border border-zinc-700 hover:bg-zinc-700'
+                }`}
+              >
+                <Mic size={14} />
+                <span className="hidden sm:inline">语音</span>
+              </button>
+
               {/* Model Selector - Two Level Dropdown */}
              <div className="relative">
                <button 
@@ -1094,6 +1110,60 @@ export default function App() {
                     console.log('Clothing changed:', state);
                   }}
                 />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Voice Chat Panel */}
+        <AnimatePresence>
+          {showVoiceChat && (
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="absolute right-0 top-16 bottom-0 w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-800 z-40 overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-200">语音聊天</h3>
+                <button 
+                  onClick={() => setShowVoiceChat(false)}
+                  className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                  <X size={16} className="text-zinc-400" />
+                </button>
+              </div>
+              <div className="flex-1 p-4">
+                <VoiceChat 
+                  onTranscript={(text) => {
+                    console.log('Voice transcript:', text);
+                    // 可以在这里处理语音转文字的结果
+                    // 例如自动发送消息
+                    setInput(text);
+                  }}
+                  onSpeaking={(speaking) => {
+                    setIsVoiceSpeaking(speaking);
+                  }}
+                />
+                
+                {/* 语音提示 */}
+                <div className="mt-4 p-3 bg-zinc-800/50 rounded-lg">
+                  <p className="text-xs text-zinc-400">
+                    💡 点击麦克风按钮开始语音对话
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    支持中文、英文、日文等多种语言
+                  </p>
+                </div>
+
+                {/* 语音状态 */}
+                {isVoiceSpeaking && (
+                  <div className="mt-4 flex items-center gap-2 text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-xs">正在听取语音...</span>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
