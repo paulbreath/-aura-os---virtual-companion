@@ -11,7 +11,8 @@ import {
   Settings,
   Play,
   Pause,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { 
   live2dService, 
@@ -24,12 +25,21 @@ interface Live2DCharacterProps {
   modelPath?: string;
   onExpressionChange?: (expression: string) => void;
   onClothingChange?: (state: ClothingState) => void;
+  onModelChange?: (modelPath: string) => void;
 }
 
+// 可用模型列表
+const AVAILABLE_MODELS = [
+  { path: '/models/mao/Mao.model3.json', name: 'Mao (默认)' },
+  { path: '/models/sexy_cat_girl/Mao.model3.json', name: '性感猫娘' },
+  { path: '/models/sample.model3.json', name: '示例模型' },
+];
+
 export default function Live2DCharacter({ 
-  modelPath = '/models/default.model3.json',
+  modelPath = '/models/mao/Mao.model3.json',
   onExpressionChange,
-  onClothingChange
+  onClothingChange,
+  onModelChange
 }: Live2DCharacterProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -37,6 +47,8 @@ export default function Live2DCharacter({
   const [clothingState, setClothingState] = useState<ClothingState>('dressed');
   const [showControls, setShowControls] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [currentModelPath, setCurrentModelPath] = useState(modelPath);
 
   // 初始化 Live2D
   useEffect(() => {
@@ -45,7 +57,7 @@ export default function Live2DCharacter({
 
       const success = await live2dService.initialize(containerRef.current);
       if (success) {
-        const loaded = await live2dService.loadModel(modelPath);
+        const loaded = await live2dService.loadModel(currentModelPath);
         setIsLoaded(loaded);
       }
     };
@@ -55,7 +67,7 @@ export default function Live2DCharacter({
     return () => {
       live2dService.destroy();
     };
-  }, [modelPath]);
+  }, [currentModelPath]);
 
   // 设置表情
   const handleSetExpression = async (expression: Live2DExpression) => {
@@ -145,6 +157,42 @@ export default function Live2DCharacter({
             className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-900/95 to-transparent p-4"
           >
             <div className="max-w-md mx-auto space-y-4">
+              {/* 模型选择器 */}
+              <div>
+                <h4 className="text-xs font-medium text-zinc-400 mb-2">选择模型</h4>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowModelSelector(!showModelSelector)}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 flex items-center justify-between"
+                  >
+                    <span>{AVAILABLE_MODELS.find(m => m.path === currentModelPath)?.name || '选择模型'}</span>
+                    <ChevronDown size={16} className="text-zinc-400" />
+                  </button>
+                  
+                  {showModelSelector && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+                      {AVAILABLE_MODELS.map(model => (
+                        <button
+                          key={model.path}
+                          onClick={() => {
+                            setCurrentModelPath(model.path);
+                            setShowModelSelector(false);
+                            onModelChange?.(model.path);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                            currentModelPath === model.path
+                              ? 'bg-pink-500 text-white'
+                              : 'text-zinc-200 hover:bg-zinc-700'
+                          }`}
+                        >
+                          {model.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* 表情控制 */}
               <div>
                 <h4 className="text-xs font-medium text-zinc-400 mb-2">表情</h4>

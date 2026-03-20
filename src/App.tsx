@@ -68,7 +68,7 @@ export default function App() {
   const [userMemory, setUserMemory] = useState<UserMemory>(() => loadUserMemory());
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [showLive2D, setShowLive2D] = useState(false);
-  const [live2DModelPath, setLive2DModelPath] = useState('/models/default.model3.json');
+  const [live2DModelPath, setLive2DModelPath] = useState('/models/mao/Mao.model3.json');
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
 
