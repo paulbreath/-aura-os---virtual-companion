@@ -8,7 +8,7 @@ import fs from 'fs';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5173;
 
 // Rate limiting
 const limiter = rateLimit({
@@ -18,7 +18,7 @@ const limiter = rateLimit({
 });
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://aurabot.zeabur.app',
+  origin: process.env.FRONTEND_URL || ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'https://aurabot.zeabur.app'],
   credentials: true
 }));
 app.use(limiter);
@@ -55,6 +55,106 @@ const fetchImageAsBase64 = async (url) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ModelsLab API代理 - 解决CORS问题
+app.post('/api/modelslab', async (req, res) => {
+  const { model_id, prompt, negative_prompt, width, height, ...otherParams } = req.body;
+  const apiKey = process.env.MODELSLAB_API_KEY || process.env.VITE_MODELSLAB_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(400).json({ status: 'error', message: 'ModelsLab API key not configured' });
+  }
+  
+  if (!prompt || !model_id) {
+    return res.status(400).json({ status: 'error', message: 'model_id and prompt are required' });
+  }
+  
+  console.log(`[${new Date().toISOString()}] ModelsLab request: model=${model_id}, prompt length=${prompt.length}`);
+  
+  try {
+    const response = await fetch('https://modelslab.com/api/v6/images/text2img', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: apiKey,
+        model_id,
+        prompt,
+        negative_prompt: negative_prompt || 'child, underage, ugly, deformed, blurry, low quality',
+        width: width || 512,
+        height: height || 768,
+        safety_checker: 'no',
+        samples: 1,
+        num_inference_steps: 30,
+        safety_checker_type: 'blacklist',
+        enhance_prompt: 'yes',
+        guidance_scale: 7,
+        base64: 'no',
+        ...otherParams,
+      }),
+    });
+    
+    const data = await response.json();
+    console.log(`[${new Date().toISOString()}] ModelsLab response: status=${data.status}`);
+    
+    // 如果是异步处理，需要轮询
+    if (data.status === 'processing' && data.fetch_result) {
+      console.log(`[${new Date().toISOString()}] ModelsLab async processing, polling...`);
+      
+      const maxAttempts = 20;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
+        
+        const pollRes = await fetch(data.fetch_result, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: apiKey }),
+        });
+        
+        const pollData = await pollRes.json();
+        console.log(`[${new Date().toISOString()}] ModelsLab poll ${i + 1}/${maxAttempts}: status=${pollData.status}`);
+        
+        if (pollData.status === 'success') {
+          return res.json(pollData);
+        } else if (pollData.status === 'failed') {
+          return res.status(500).json({ status: 'error', message: 'Image generation failed' });
+        }
+      }
+      
+      return res.status(504).json({ status: 'error', message: 'Image generation timeout' });
+    }
+    
+    // 直接返回结果
+    res.json(data);
+    
+  } catch (error) {
+    console.error('ModelsLab proxy error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ModelsLab 轮询端点
+app.post('/api/modelslab/poll', async (req, res) => {
+  const { fetch_url } = req.body;
+  const apiKey = process.env.MODELSLAB_API_KEY || process.env.VITE_MODELSLAB_API_KEY;
+  
+  if (!apiKey || !fetch_url) {
+    return res.status(400).json({ status: 'error', message: 'Missing required parameters' });
+  }
+  
+  try {
+    const pollRes = await fetch(fetch_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: apiKey }),
+    });
+    
+    const data = await pollRes.json();
+    res.json(data);
+  } catch (error) {
+    console.error('ModelsLab poll error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
 app.post('/api/generate-image', async (req, res) => {
@@ -201,8 +301,13 @@ if (fs.existsSync(distPath)) {
   console.warn('dist directory not found, skipping static file serving');
 }
 
+const xaiKey = process.env.XAI_API_KEY;
+const falKey = process.env.FAL_API_KEY;
+const modelsLabKey = process.env.MODELSLAB_API_KEY || process.env.VITE_MODELSLAB_API_KEY;
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`X.AI API: ${xaiKey ? 'Configured' : 'Not configured'}`);
   console.log(`FAL.AI API: ${falKey ? 'Configured' : 'Not configured'}`);
+  console.log(`ModelsLab API: ${modelsLabKey ? 'Configured' : 'Not configured'}`);
 });

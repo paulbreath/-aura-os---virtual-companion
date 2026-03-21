@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
 import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext } from './services/memoryService';
+import { live2dService } from './services/live2dService';
 import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AvatarCreator from './components/AvatarCreator';
@@ -8,6 +9,7 @@ import Live2DCharacter from './components/Live2DCharacter';
 import VoiceChat from './components/VoiceChat';
 
 export default function App() {
+  const [startTime] = useState(Date.now());
   const [chatMode, setChatMode] = useState<'solo' | 'group'>('solo');
   const [currentAvatar, setCurrentAvatar] = useState<Avatar>(AVATARS[0]);
   const [groupMembers, setGroupMembers] = useState<Avatar[]>([AVATARS[0], AVATARS[1]]);
@@ -58,9 +60,26 @@ export default function App() {
       return {};
     }
   });
+  // 每个角色独立的头像图片
+  const [avatarImages, setAvatarImages] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('aura-avatar-images');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error('Failed to load saved avatar images:', e);
+      return {};
+    }
+  });
+  // 保留向后兼容：如果之前有全局头像，迁移到第一个角色
   const [customAvatarImage, setCustomAvatarImage] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('aura-custom-avatar-image') || null;
+      const oldImage = localStorage.getItem('aura-custom-avatar-image');
+      if (oldImage) {
+        // 迁移到新系统
+        localStorage.removeItem('aura-custom-avatar-image');
+        return oldImage;
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -68,11 +87,40 @@ export default function App() {
   const [userMemory, setUserMemory] = useState<UserMemory>(() => loadUserMemory());
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [showLive2D, setShowLive2D] = useState(false);
-  const [live2DModelPath, setLive2DModelPath] = useState('/models/mao/Mao.model3.json');
+  const [live2DModelPath, setLive2DModelPath] = useState('/models/epsilon/Epsilon_free/runtime/Epsilon_free.model3.json');
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
+  const [live2DSize, setLive2DSize] = useState({ width: 288, height: 384 });
+  const [isResizing, setIsResizing] = useState(false);
+  const live2DRef = useRef<HTMLDivElement>(null);
 
-  // Save custom avatar image to localStorage
+  // Live2D 空闲动画
+  useEffect(() => {
+    if (!showLive2D) return;
+    
+    const idleInterval = setInterval(() => {
+      live2dService.playRandomMotion();
+    }, 8000 + Math.random() * 7000); // 8-15秒随机间隔
+    
+    return () => clearInterval(idleInterval);
+  }, [showLive2D]);
+
+  // Save avatar images to localStorage
+  useEffect(() => {
+    try {
+      const serialized = JSON.stringify(avatarImages);
+      const size = new Blob([serialized]).size;
+      if (size > 4 * 1024 * 1024) { // 4MB limit
+        console.warn('Avatar images data too large for localStorage');
+        return;
+      }
+      localStorage.setItem('aura-avatar-images', serialized);
+    } catch (e) {
+      console.error('Failed to save avatar images:', e);
+    }
+  }, [avatarImages]);
+  
+  // Legacy: Save custom avatar image to localStorage (for migration)
   useEffect(() => {
     if (customAvatarImage) {
       localStorage.setItem('aura-custom-avatar-image', customAvatarImage);
@@ -99,6 +147,28 @@ export default function App() {
     return avatarVoices[avatarId] || AVATARS.find(a => a.id === avatarId)?.voiceName || 'ttv-voice-2026031023545326-M2Ysf3RQ';
   };
 
+  // 设置特定角色的头像
+  const setAvatarImage = (avatarId: string, imageUrl: string) => {
+    setAvatarImages(prev => ({
+      ...prev,
+      [avatarId]: imageUrl
+    }));
+  };
+  
+  // 获取特定角色的头像
+  const getAvatarImage = (avatarId: string): string | null => {
+    return avatarImages[avatarId] || null;
+  };
+  
+  // 删除特定角色的头像
+  const removeAvatarImage = (avatarId: string) => {
+    setAvatarImages(prev => {
+      const newImages = { ...prev };
+      delete newImages[avatarId];
+      return newImages;
+    });
+  };
+
   const handleUploadAvatarImage = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -106,14 +176,14 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
-      setCustomAvatarImage(result);
+      // 保存到当前角色
+      setAvatarImage(currentAvatar.id, result);
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearCustomAvatar = () => {
-    setCustomAvatarImage(null);
-    localStorage.removeItem('aura-custom-avatar-image');
+    removeAvatarImage(currentAvatar.id);
   };
 
   // Save avatar backgrounds to localStorage
@@ -394,6 +464,58 @@ export default function App() {
       return;
     }
 
+    // 检测命令 (以 / 开头)
+    if (input.startsWith('/')) {
+      const cmd = input.toLowerCase().split(' ')[0];
+      let response = '';
+      
+      switch (cmd) {
+        case '/model':
+          response = `📦 **当前模型**: Grok 4.1 Fast\n\`grok-4-1-fast-non-reasoning\`\n\n**提供商**: X.AI\n**API**: 已连接 ✅`;
+          break;
+        case '/status':
+          const uptime = Math.floor((Date.now() - startTime) / 1000);
+          const mins = Math.floor(uptime / 60);
+          const secs = uptime % 60;
+          response = `📊 **系统状态**\n\n- **AI模型**: Grok 4.1 Fast\n- **Live2D**: ${showLive2D ? '已启用 ✅' : '已禁用'}\n- **语音模式**: ${voiceMode ? '已启用 ✅' : '已禁用'}\n- **聊天模式**: ${chatMode === 'solo' ? '单人' : '群聊'}\n- **运行时间**: ${mins}分${secs}秒\n- **消息数量**: ${messages.length}`;
+          break;
+        case '/help':
+          response = `📖 **可用命令**\n\n- \`/model\` - 查看当前AI模型\n- \`/status\` - 查看系统状态\n- \`/clear\` - 清除聊天记录\n- \`/memory\` - 查看用户记忆\n- \`/help\` - 显示帮助信息`;
+          break;
+        case '/clear':
+          setMessages([{
+            id: Date.now().toString(),
+            role: 'model',
+            content: '聊天记录已清空～让我们重新开始吧！💕',
+            timestamp: new Date(),
+            source: 'direct',
+            senderId: currentAvatar.id,
+            senderName: currentAvatar.name
+          }]);
+          setInput('');
+          return;
+        case '/memory':
+          const memCount = userMemory.memories.length;
+          const prefs = Object.keys(userMemory.preferences || {}).length;
+          response = `🧠 **用户记忆**\n\n- **记忆条数**: ${memCount}\n- **偏好设置**: ${prefs}\n\n记忆帮助我更好地了解你～`;
+          break;
+        default:
+          response = `❓ 未知命令: \`${cmd}\`\n输入 \`/help\` 查看可用命令`;
+      }
+      
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        content: response,
+        timestamp: new Date(),
+        source: 'direct',
+        senderId: 'system',
+        senderName: 'System'
+      }]);
+      setInput('');
+      return;
+    }
+
     const newUserMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -405,6 +527,11 @@ export default function App() {
     setMessages(prev => [...prev, newUserMsg]);
     setInput('');
     setIsTyping(true);
+    
+    // Live2D 角色反应 - 用户消息
+    if (showLive2D) {
+      live2dService.reactToText(input);
+    }
 
     // Extract and save memory from user message
     const content = input.toLowerCase();
@@ -442,6 +569,11 @@ export default function App() {
 
         setMessages(prev => [...prev, newMsg]);
         if (audioData) await playAudio(audioData);
+        
+        // Live2D 角色反应 - AI 回复
+        if (showLive2D) {
+          live2dService.reactToText(aiResponse);
+        }
       } else {
         // Group Chat Logic
         setLastGroupSpeakerTime(0); // Reset so avatars can respond to user
@@ -584,7 +716,8 @@ export default function App() {
     });
   };
 
-  const characterImage = customAvatarImage || avatarBackgrounds[currentAvatar.id] || `https://picsum.photos/seed/${currentAvatar.seed}/800/1200`;
+  // 获取当前角色的头像图片（优先级：角色独立头像 > 角色背景 > 默认图片）
+  const characterImage = getAvatarImage(currentAvatar.id) || avatarBackgrounds[currentAvatar.id] || `https://picsum.photos/seed/${currentAvatar.seed}/800/1200`;
 
 
 
@@ -608,7 +741,7 @@ export default function App() {
              {groupMembers.slice(0, 4).map(avatar => (
                <div key={avatar.id} className="relative w-full h-full">
                  <img 
-                   src={avatarBackgrounds[avatar.id] || `https://picsum.photos/seed/${avatar.seed}/400/600`}
+                   src={getAvatarImage(avatar.id) || avatarBackgrounds[avatar.id] || `https://picsum.photos/seed/${avatar.seed}/400/600`}
                    alt={avatar.name} 
                    className="w-full h-full object-cover opacity-60"
                    referrerPolicy="no-referrer"
@@ -689,7 +822,7 @@ export default function App() {
                      }`}
                    >
                      <img 
-                       src={avatarBackgrounds[avatar.id] || `https://picsum.photos/seed/${avatar.seed}/100/100`}
+                       src={getAvatarImage(avatar.id) || avatarBackgrounds[avatar.id] || `https://picsum.photos/seed/${avatar.seed}/100/100`}
                        alt={avatar.name}
                        className="w-10 h-10 rounded-full object-cover border border-zinc-700"
                        referrerPolicy="no-referrer"
@@ -737,18 +870,19 @@ export default function App() {
                          {isSelected && <div className="w-2 h-2 bg-white rounded-sm" />}
                        </div>
                      )}
-                     {avatarBackgrounds[avatar.id] && (
-                       <button
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           handleRemoveBackground(avatar.id);
-                         }}
-                         className="p-1 text-zinc-400 hover:text-red-400 transition-colors"
-                         title="Remove background"
-                       >
-                         <X size={12} />
-                       </button>
-                     )}
+                      {(avatarBackgrounds[avatar.id] || avatarImages[avatar.id]) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveBackground(avatar.id);
+                            removeAvatarImage(avatar.id);
+                          }}
+                          className="p-1 text-zinc-400 hover:text-red-400 transition-colors"
+                          title="Remove avatar & background"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
                    </button>
                  );
               })}
@@ -1081,25 +1215,91 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Live2D Panel */}
+        {/* Live2D Floating Window - Resizable */}
         <AnimatePresence>
           {showLive2D && (
             <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="absolute left-0 top-16 bottom-0 w-80 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-40 overflow-hidden flex flex-col"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25 }}
+              style={{
+                width: live2DSize.width,
+                height: live2DSize.height,
+              }}
+              className="fixed right-4 bottom-24 bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-zinc-700/50 z-50 overflow-hidden flex flex-col"
+              ref={live2DRef}
             >
-              <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-zinc-200">Live2D 动态角色</h3>
-                <button 
-                  onClick={() => setShowLive2D(false)}
-                  className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
-                >
-                  <X size={16} className="text-zinc-400" />
-                </button>
+              {/* 拖动标题栏 */}
+              <div 
+                className="p-2 bg-zinc-800/80 border-b border-zinc-700/50 flex items-center justify-between flex-shrink-0 cursor-move select-none"
+                onMouseDown={(e) => {
+                  if (!live2DRef.current || (e.target as HTMLElement).closest('button')) return;
+                  e.preventDefault();
+                  
+                  const el = live2DRef.current;
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const rect = el.getBoundingClientRect();
+                  const startRight = window.innerWidth - rect.right;
+                  const startBottom = window.innerHeight - rect.bottom;
+                  
+                  const onMouseMove = (e: MouseEvent) => {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    el.style.right = `${Math.max(0, startRight - dx)}px`;
+                    el.style.bottom = `${Math.max(0, startBottom - dy)}px`;
+                  };
+                  
+                  const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                  };
+                  
+                  document.addEventListener('mousemove', onMouseMove);
+                  document.addEventListener('mouseup', onMouseUp);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-pink-500" />
+                  <span className="text-xs font-medium text-zinc-300">Epsilon</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {/* 最小化按钮 */}
+                  <button 
+                    onClick={() => setLive2DSize({ width: 200, height: 280 })}
+                    className="p-1 hover:bg-zinc-700 rounded-full transition-colors"
+                    title="最小化"
+                  >
+                    <span className="text-zinc-400 text-xs">−</span>
+                  </button>
+                  {/* 默认大小按钮 */}
+                  <button 
+                    onClick={() => setLive2DSize({ width: 288, height: 384 })}
+                    className="p-1 hover:bg-zinc-700 rounded-full transition-colors"
+                    title="默认大小"
+                  >
+                    <span className="text-zinc-400 text-xs">◻</span>
+                  </button>
+                  {/* 最大化按钮 */}
+                  <button 
+                    onClick={() => setLive2DSize({ width: 450, height: 600 })}
+                    className="p-1 hover:bg-zinc-700 rounded-full transition-colors"
+                    title="最大化"
+                  >
+                    <span className="text-zinc-400 text-xs">□</span>
+                  </button>
+                  {/* 关闭按钮 */}
+                  <button 
+                    onClick={() => setShowLive2D(false)}
+                    className="p-1 hover:bg-zinc-700 rounded-full transition-colors"
+                  >
+                    <X size={12} className="text-zinc-400" />
+                  </button>
+                </div>
               </div>
+              
+              {/* Live2D 内容 */}
               <div className="flex-1 overflow-hidden">
                 <Live2DCharacter 
                   modelPath={live2DModelPath}
@@ -1110,6 +1310,42 @@ export default function App() {
                     console.log('Clothing changed:', state);
                   }}
                 />
+              </div>
+              
+              {/* 右下角缩放手柄 */}
+              <div
+                className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const startWidth = live2DSize.width;
+                  const startHeight = live2DSize.height;
+                  
+                  const onMouseMove = (e: MouseEvent) => {
+                    const newWidth = Math.max(200, Math.min(600, startWidth + (e.clientX - startX)));
+                    const newHeight = Math.max(280, Math.min(800, startHeight + (e.clientY - startY)));
+                    setLive2DSize({ width: newWidth, height: newHeight });
+                  };
+                  
+                  const onMouseUp = () => {
+                    setIsResizing(false);
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                  };
+                  
+                  document.addEventListener('mousemove', onMouseMove);
+                  document.addEventListener('mouseup', onMouseUp);
+                }}
+              >
+                <svg 
+                  className="absolute bottom-1 right-1 w-3 h-3 text-zinc-500" 
+                  viewBox="0 0 24 24" 
+                  fill="currentColor"
+                >
+                  <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22Z" />
+                </svg>
               </div>
             </motion.div>
           )}
@@ -1194,11 +1430,11 @@ export default function App() {
                 >
                   <Camera size={20} />
                 </button>
-                {customAvatarImage && (
+                {getAvatarImage(currentAvatar.id) && (
                   <button
                     onClick={handleClearCustomAvatar}
                     className="p-3 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded-full transition-all"
-                    title="Remove Custom Avatar"
+                    title="Remove Avatar"
                   >
                     <X size={20} />
                   </button>
@@ -1287,9 +1523,27 @@ export default function App() {
       <AnimatePresence>
         {showAvatarCreator && (
           <AvatarCreator
-            onComplete={(customization, imageUrl) => {
-              console.log('Avatar created:', customization, imageUrl);
-              // TODO: Save avatar and update state
+            onComplete={(customization, avatarUrl, backgroundUrl) => {
+              console.log('Avatar created:', customization, avatarUrl, backgroundUrl);
+              
+              // 保存头像图片到当前角色
+              if (avatarUrl) {
+                setAvatarImage(currentAvatar.id, avatarUrl);
+              }
+              
+              // 保存背景图片到当前角色
+              if (backgroundUrl) {
+                handleSetBackground(currentAvatar.id, backgroundUrl);
+              }
+              
+              // 更新当前角色名称
+              if (customization.name) {
+                setCurrentAvatar(prev => ({
+                  ...prev,
+                  name: customization.name
+                }));
+              }
+              
               setShowAvatarCreator(false);
             }}
             onCancel={() => setShowAvatarCreator(false)}

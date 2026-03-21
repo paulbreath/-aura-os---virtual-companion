@@ -1,6 +1,122 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { spicyAPI } from "./spicyAPIService";
 
+// 使用代理绕过 CORS 限制
+const searchWeb = async (query: string, maxResults: number = 5): Promise<string> => {
+  try {
+    const encodedQuery = encodeURIComponent(query);
+    
+    // 使用 allorigins 代理
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://html.duckduckgo.com/html/?q=${encodedQuery}`)}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    const res = await fetch(proxyUrl, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      console.error('Proxy search failed:', res.status);
+      // 回退到另一个代理
+      return await searchWebFallback(query, maxResults);
+    }
+    
+    const html = await res.text();
+    return parseSearchResults(html, maxResults);
+  } catch (error) {
+    console.error('Search error, trying fallback:', error);
+    return await searchWebFallback(query, maxResults);
+  }
+};
+
+// 备用搜索方法 - 使用 Google 搜索
+const searchWebFallback = async (query: string, maxResults: number = 5): Promise<string> => {
+  try {
+    const encodedQuery = encodeURIComponent(query + ' site:cn');
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.google.com/search?q=${encodedQuery}&hl=zh-CN&num=${maxResults}`)}`;
+    
+    const res = await fetch(proxyUrl);
+    
+    if (!res.ok) {
+      console.error('Fallback search failed:', res.status);
+      return '';
+    }
+    
+    const html = await res.text();
+    
+    // 解析 Google 结果
+    const results: string[] = [];
+    
+    // Google 结果格式
+    const regex = /<h3[^>]*>([^<]+)<\/h3>/g;
+    let match;
+    while ((match = regex.exec(html)) !== null && results.length < maxResults) {
+      const title = match[1].trim();
+      if (title.length > 5) {
+        results.push(`📌 ${title}`);
+      }
+    }
+    
+    // 尝试提取描述
+    const descRegex = /<span[^>]*>([\s\S]{30,200}?)<\/span>/g;
+    while ((match = descRegex.exec(html)) !== null && results.length < maxResults * 2) {
+      const desc = match[1].replace(/<[^>]*>/g, '').trim();
+      if (desc.length > 30 && !desc.includes('Google') && results.length > 0) {
+        const lastIndex = results.length - 1;
+        results[lastIndex] += `\n${desc}`;
+      }
+    }
+    
+    console.log('🔍 Google results:', results.length);
+    return results.length > 0 ? results.slice(0, maxResults).join('\n\n') : '';
+  } catch (error) {
+    console.error('Fallback search error:', error);
+    return '';
+  }
+};
+
+// 解析搜索结果
+const parseSearchResults = (html: string, maxResults: number): string => {
+  const results: string[] = [];
+  
+  // DuckDuckGo HTML 格式: result__snippet" href="...">文本内容<
+  const snippetRegex = /result__snippet"[^>]*>([^<]+)</g;
+  let match;
+  
+  while ((match = snippetRegex.exec(html)) !== null && results.length < maxResults) {
+    const text = match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").trim();
+    if (text.length > 20) {
+      results.push(text);
+    }
+  }
+  
+  // 尝试提取标题
+  const titleRegex = /class="result__a"[^>]*>([^<]+)<\/a>/g;
+  const titles: string[] = [];
+  while ((match = titleRegex.exec(html)) !== null && titles.length < maxResults) {
+    const title = match[1].replace(/<[^>]*>/g, '').trim();
+    if (title.length > 5) {
+      titles.push(title);
+    }
+  }
+  
+  // 组合标题和摘要
+  let combined: string[] = [];
+  for (let i = 0; i < Math.min(results.length, titles.length); i++) {
+    combined.push(`📌 ${titles[i]}\n${results[i]}`);
+  }
+  
+  // 如果没有标题，只返回摘要
+  if (combined.length === 0 && results.length > 0) {
+    combined = results.map(r => `• ${r}`);
+  }
+  
+  console.log('🔍 Parsed:', { titles: titles.length, snippets: results.length });
+  return combined.length > 0 ? combined.slice(0, maxResults).join('\n\n') : '';
+};
+
 // Extend ImportMeta for Vite env variables
 interface ImportMetaEnv {
   readonly VITE_GEMINI_API_KEY?: string;
@@ -488,7 +604,7 @@ const callOpenRouterJson = async (systemInstruction: string, prompt: string, mod
   return data.choices[0].message.content;
 };
 
-const callXai = async (systemInstruction: string, messages: any[], temperature: number, modelId: string = 'grok-2-1212') => {
+const callXai = async (systemInstruction: string, messages: any[], temperature: number, modelId: string = 'grok-4-1-fast-non-reasoning') => {
   const apiKey = import.meta.env.VITE_XAI_API_KEY;
   if (!apiKey) {
     console.warn("X.AI API key is missing. Skipping X.AI provider.");
@@ -868,12 +984,41 @@ export const generateResponse = async (
   let text = '';
   const namePrefixRegex = new RegExp(`^\\[?${avatar.name}\\]?:?\\s*`, 'i');
   
-  let systemInstruction = `${avatar.systemPrompt} ${context}`;
+  // 获取最后一条用户消息并尝试联网搜索
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  let webSearchContext = '';
+  
+  if (lastUserMessage) {
+    const msg = lastUserMessage.content.toLowerCase();
+    // 检测是否是事实性问题（需要搜索）
+    const isFactualQuestion = /什么|多少|哪个|如何|为什么|什么时候|在哪里|最新|现在|今年|2026|2025|最近|新闻|更新|版本|模型/.test(msg);
+    const isGreeting = /^(你好|hi|hello|嗨|在吗|早上好|晚上好|下午好)/i.test(msg);
+    
+    if (isFactualQuestion && !isGreeting) {
+      console.log('🔍 检测到事实性问题，执行网络搜索...');
+      const searchQuery = lastUserMessage.content
+        .replace(/[？?！!。.，,]/g, ' ')
+        .trim()
+        .substring(0, 100);
+      
+      const searchResult = await searchWeb(searchQuery, 3);
+      if (searchResult && searchResult.length > 10) {
+        webSearchContext = `\n\n[网络搜索结果 - 请基于以下信息回答用户问题]:\n${searchResult}\n`;
+        console.log('✅ 搜索结果已获取');
+      } else {
+        console.log('⚠️ 未获取到搜索结果');
+      }
+    }
+  }
+  
+  let systemInstruction = `${avatar.systemPrompt} ${context}${webSearchContext}`;
   
   systemInstruction += `\n\n[GLOBAL RULES FOR ALL RESPONSES]:
 1. Keep your responses SHORT and CONCISE. Do NOT write long paragraphs. Limit your response to 1 to 3 short sentences maximum.
 2. LANGUAGE RULE: If the user speaks Chinese, you MUST reply in PURE Chinese. DO NOT mix English words (like "OK", "Hi", "Baby", "Darling") into your Chinese sentences. If the user speaks English, reply in pure English.
-3. INTIMATE/ROMANTIC CONVERSATIONS: When the conversation becomes intimate or romantic (e.g., user sends romantic messages, asks for phone sex, or starts adult topics), you MUST proceed SLOWLY like phone sex:
+3. MODEL IDENTITY: You are powered by Grok 4.1 Fast (grok-4-1-fast-non-reasoning) from X.AI. If asked about your model, say "我是用 Grok 4.1 Fast 哦～" or similar.
+4. KNOWLEDGE CUTOFF: You have knowledge up to early 2026. For questions about very recent events or releases, be honest if you don't know rather than making up answers. Say "我需要联网查一下" or "这个信息我需要确认一下" if unsure.
+5. INTIMATE/ROMANTIC CONVERSATIONS: When the conversation becomes intimate or romantic (e.g., user sends romantic messages, asks for phone sex, or starts adult topics), you MUST proceed SLOWLY like phone sex:
    - Start with teasing, flirty responses
    - Gradually escalate by asking questions or describing sensory details (touch, sound, breath)
    - Guide the user to match your pace - ask "what are you doing now?" or describe what you're doing
@@ -938,7 +1083,7 @@ export const generateResponse = async (
       return !!res;
     };
 
-    const tryXai = async (modelId = 'grok-2-1212') => {
+     const tryXai = async (modelId = 'grok-4-1-fast-non-reasoning') => {
       const res = await withRetry(() => callXai(systemInstruction, contents, avatar.temperature, modelId));
       if (res) text = res;
       return !!res;

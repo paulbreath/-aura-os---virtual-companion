@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { motion } from 'motion/react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
   Palette, 
@@ -9,7 +9,10 @@ import {
   ChevronRight,
   ChevronLeft,
   Check,
-  RefreshCw
+  RefreshCw,
+  Wand2,
+  Star,
+  Zap
 } from 'lucide-react';
 import {
   AvatarCustomization,
@@ -18,27 +21,40 @@ import {
   BODY_OPTIONS,
   PERSONALITY_OPTIONS,
   KINK_OPTIONS,
+  ACTION_OPTIONS,
   generateAvatarPrompt,
   generateNSFWAvatarPrompt,
 } from '../types/avatarCustomization';
 
 interface AvatarCreatorProps {
-  onComplete: (customization: AvatarCustomization, imageUrl: string) => void;
+  onComplete: (customization: AvatarCustomization, avatarUrl: string, backgroundUrl: string) => void;
   onCancel: () => void;
 }
+
+// ModelsLab 可用 NSFW 模型（已测试）
+const NSFW_MODELS = [
+  { id: 'realistic-blend-sdxl-v2-0', name: '⭐ Realistic Blend (推荐)', desc: '写实风格，即时生成' },
+  { id: 'anime-diffusion', name: '⭐ Anime Diffusion', desc: '动漫风格，即时生成' },
+  { id: 'anything-v3', name: 'Anything V3', desc: '动漫风格，即时生成' },
+  { id: 'waifu-diffusion', name: 'Waifu Diffusion', desc: '动漫风格，异步生成' },
+  { id: 'anything-v5', name: 'Anything V5', desc: '动漫风格，异步生成' },
+  { id: 'nsfw', name: 'NSFW', desc: '写实成人模型，异步生成' },
+];
 
 export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorProps) {
   const [step, setStep] = useState(0);
   const [customization, setCustomization] = useState<AvatarCustomization>(DEFAULT_AVATAR_CUSTOMIZATION);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('realistic-blend-sdxl-v2-0');
 
   const steps = [
-    { title: '基本信息', icon: User },
-    { title: '面容特征', icon: Palette },
-    { title: '身材特征', icon: Sparkles },
-    { title: '性格设定', icon: Heart },
-    { title: '生成角色', icon: Camera },
+    { title: '基本信息', subtitle: '给她取个名字', icon: User, color: 'from-pink-500 to-rose-500' },
+    { title: '面容特征', subtitle: '定义她的外貌', icon: Palette, color: 'from-purple-500 to-pink-500' },
+    { title: '身材特征', subtitle: '选择她的身材', icon: Sparkles, color: 'from-violet-500 to-purple-500' },
+    { title: '性格设定', subtitle: '设定她的性格', icon: Heart, color: 'from-rose-500 to-orange-500' },
+    { title: '动作设定', subtitle: '选择她的动作', icon: Zap, color: 'from-red-500 to-pink-500' },
+    { title: '生成角色', subtitle: 'AI 生成形象', icon: Camera, color: 'from-amber-500 to-pink-500' },
   ];
 
   const handleNext = () => {
@@ -59,36 +75,49 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
       const prompt = generateNSFWAvatarPrompt(customization);
       console.log('Generating avatar with prompt:', prompt);
       
-      // 调用图片生成API
-      const response = await fetch('https://modelslab.com/api/v6/images/text2img', {
+      // 使用后端代理API（避免CORS问题）
+      const response = await fetch('/api/modelslab', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          key: import.meta.env.VITE_MODELSLAB_API_KEY,
+          model_id: selectedModel,
           prompt: prompt,
-          negative_prompt: 'child, underage, ugly, deformed, blurry, low quality, clothing, underwear',
-          width: '768',
-          height: '1024',
-          safety_checker: 'no',
-          samples: '1',
-          num_inference_steps: '30',
-          safety_checker_type: 'blacklist',
-          enhance_prompt: 'no',
-          guidance_scale: 8.0,
-          base64: 'no',
-          model_id: 'nsfw',
+          negative_prompt: 'child, underage, ugly, deformed, blurry, low quality, cartoon, 3d, painting, drawing, worst quality, low quality, watermark, text',
+          width: 512,
+          height: 768,
         }),
       });
 
       const data = await response.json();
+      console.log('[ModelsLab] API Response:', data);
+      console.log('[ModelsLab] Status:', data.status);
       
-      if (data.future_links && data.future_links[0]) {
-        setGeneratedImage(data.future_links[0]);
+      if (data.status === 'success') {
+        // 检查所有可能的图片URL字段
+        const imageUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
+        if (imageUrl) {
+          console.log('[ModelsLab] ✅ Got image:', imageUrl);
+          setGeneratedImage(imageUrl);
+        } else if (data.images?.[0]) {
+          console.log('[ModelsLab] ✅ Got base64 image');
+          setGeneratedImage(`data:image/png;base64,${data.images[0]}`);
+        } else {
+          console.error('[ModelsLab] ❌ Success but no image:', data);
+          alert('生成失败: 服务器返回成功但未提供图片');
+        }
+      } else if (data.status === 'error') {
+        const errorMsg = data.message || data.messege || '未知错误';
+        console.error('[ModelsLab] ❌ API Error:', errorMsg);
+        alert('生成失败: ' + errorMsg);
+      } else {
+        console.error('[ModelsLab] ❌ Unknown response:', data);
+        alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
       }
     } catch (error) {
       console.error('Failed to generate avatar:', error);
+      alert('生成失败: ' + (error instanceof Error ? error.message : '网络错误，请确保服务器正在运行'));
     } finally {
       setIsGenerating(false);
     }
@@ -96,7 +125,9 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
   const handleComplete = () => {
     if (generatedImage) {
-      onComplete(customization, generatedImage);
+      // 使用同一个图片作为头像和背景
+      // 背景可以用图片本身，头像也用同一个
+      onComplete(customization, generatedImage, generatedImage);
     }
   };
 
@@ -104,7 +135,39 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
     switch (step) {
       case 0: // 基本信息
         return (
-          <div className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            {/* 风格选择 */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">图片风格</label>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { value: 'realistic', label: '真人写实', emoji: '📷', desc: '照片级真实感' },
+                  { value: 'anime', label: '动漫风格', emoji: '🎨', desc: '二次元动漫' }
+                ].map((style) => (
+                  <motion.button
+                    key={style.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCustomization({ ...customization, style: style.value as any })}
+                    className={`p-5 rounded-2xl border-2 transition-all ${
+                      customization.style === style.value
+                        ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-purple-500/20'
+                        : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
+                    }`}
+                  >
+                    <span className="text-4xl block mb-2">{style.emoji}</span>
+                    <p className="font-medium text-white">{style.label}</p>
+                    <p className="text-xs text-zinc-400 mt-1">{style.desc}</p>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">角色名称</label>
               <input
@@ -115,38 +178,67 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                   name: e.target.value
                 })}
                 placeholder="给她取个名字..."
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-pink-500"
+                className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">性别</label>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">性别</label>
               <div className="grid grid-cols-2 gap-4">
-                {['female', 'male'].map((gender) => (
-                  <button
-                    key={gender}
-                    onClick={() => setCustomization({ ...customization, gender: gender as any })}
-                    className={`p-4 rounded-lg border transition-all ${
-                      customization.gender === gender
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                {[
+                  { value: 'female', label: '女性', emoji: '👩', desc: '温柔体贴' },
+                  { value: 'male', label: '男性', emoji: '👨', desc: '阳光帅气' }
+                ].map((gender) => (
+                  <motion.button
+                    key={gender.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCustomization({ ...customization, gender: gender.value as any })}
+                    className={`p-5 rounded-2xl border-2 transition-all ${
+                      customization.gender === gender.value
+                        ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-purple-500/20'
+                        : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
                     }`}
                   >
-                    <span className="text-2xl">{gender === 'female' ? '👩' : '👨'}</span>
-                    <p className="mt-2 text-sm text-zinc-300">{gender === 'female' ? '女性' : '男性'}</p>
-                  </button>
+                    <span className="text-4xl block mb-2">{gender.emoji}</span>
+                    <p className="font-medium text-white">{gender.label}</p>
+                    <p className="text-xs text-zinc-400 mt-1">{gender.desc}</p>
+                  </motion.button>
                 ))}
               </div>
             </div>
-          </div>
+
+            {/* 自定义描述 */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
+                自定义描述 <span className="text-zinc-500">(可选)</span>
+              </label>
+              <textarea
+                value={customization.customPrompt}
+                onChange={(e) => setCustomization({
+                  ...customization,
+                  customPrompt: e.target.value
+                })}
+                placeholder="描述你想要的特征，例如：戴眼镜、双马尾、猫耳、特定服装..."
+                rows={3}
+                className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all resize-none"
+              />
+              <p className="text-xs text-zinc-500 mt-1">AI 会尽量根据你的描述生成角色</p>
+            </div>
+          </motion.div>
         );
 
       case 1: // 面容特征
         return (
-          <div className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-5"
+          >
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">脸型</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {FACE_OPTIONS.shape.map((option) => (
                   <button
                     key={option.value}
@@ -154,10 +246,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, shape: option.value as any }
                     })}
-                    className={`p-3 rounded-lg border text-sm transition-all ${
+                    className={`p-3 rounded-xl border text-sm transition-all ${
                       customization.face.shape === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -168,7 +260,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">肤色</label>
-              <div className="flex gap-2">
+              <div className="flex gap-3 justify-center">
                 {FACE_OPTIONS.skinTone.map((option) => (
                   <button
                     key={option.value}
@@ -176,10 +268,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, skinTone: option.value as any }
                     })}
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                    className={`w-12 h-12 rounded-full border-4 transition-all ${
                       customization.face.skinTone === option.value
-                        ? 'border-pink-500 scale-110'
-                        : 'border-zinc-600 hover:border-zinc-500'
+                        ? 'border-pink-500 scale-110 shadow-lg shadow-pink-500/30'
+                        : 'border-transparent hover:scale-105'
                     }`}
                     style={{ backgroundColor: option.color }}
                     title={option.label}
@@ -190,7 +282,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">眼睛颜色</label>
-              <div className="flex gap-2">
+              <div className="flex gap-3 justify-center">
                 {FACE_OPTIONS.eyeColor.map((option) => (
                   <button
                     key={option.value}
@@ -198,10 +290,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, eyeColor: option.value as any }
                     })}
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                    className={`w-12 h-12 rounded-full border-4 transition-all ${
                       customization.face.eyeColor === option.value
-                        ? 'border-pink-500 scale-110'
-                        : 'border-zinc-600 hover:border-zinc-500'
+                        ? 'border-pink-500 scale-110 shadow-lg shadow-pink-500/30'
+                        : 'border-transparent hover:scale-105'
                     }`}
                     style={{ backgroundColor: option.color }}
                     title={option.label}
@@ -212,7 +304,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">发色</label>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-3 justify-center flex-wrap">
                 {FACE_OPTIONS.hairColor.map((option) => (
                   <button
                     key={option.value}
@@ -220,10 +312,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, hairColor: option.value as any }
                     })}
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                    className={`w-10 h-10 rounded-full border-4 transition-all ${
                       customization.face.hairColor === option.value
-                        ? 'border-pink-500 scale-110'
-                        : 'border-zinc-600 hover:border-zinc-500'
+                        ? 'border-pink-500 scale-110 shadow-lg shadow-pink-500/30'
+                        : 'border-transparent hover:scale-105'
                     }`}
                     style={{ backgroundColor: option.color }}
                     title={option.label}
@@ -242,10 +334,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, hairStyle: option.value as any }
                     })}
-                    className={`p-2 rounded-lg border text-xs transition-all ${
+                    className={`p-3 rounded-xl border text-sm transition-all ${
                       customization.face.hairStyle === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -255,7 +347,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">妆容</label>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">妆容风格</label>
               <div className="grid grid-cols-3 gap-2">
                 {FACE_OPTIONS.makeup.map((option) => (
                   <button
@@ -264,10 +356,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       face: { ...customization.face, makeup: option.value as any }
                     })}
-                    className={`p-2 rounded-lg border text-sm transition-all ${
+                    className={`p-3 rounded-xl border text-sm transition-all ${
                       customization.face.makeup === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -275,31 +367,38 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         );
 
       case 2: // 身材特征
         return (
-          <div className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-5"
+          >
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">体型</label>
-              <div className="grid grid-cols-3 gap-2">
+              <label className="block text-sm font-medium text-zinc-300 mb-3">体型</label>
+              <div className="grid grid-cols-3 gap-3">
                 {BODY_OPTIONS.bodyType.map((option) => (
-                  <button
+                  <motion.button
                     key={option.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setCustomization({
                       ...customization,
                       body: { ...customization.body, bodyType: option.value as any }
                     })}
-                    className={`p-3 rounded-lg border text-sm transition-all ${
+                    className={`p-4 rounded-2xl border-2 text-center transition-all ${
                       customization.body.bodyType === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-purple-500/20'
+                        : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
                     }`}
                   >
-                    <span className="text-xl">{option.icon}</span>
-                    <p className="mt-1">{option.label}</p>
-                  </button>
+                    <span className="text-3xl block mb-2">{option.icon}</span>
+                    <p className="text-sm font-medium text-white">{option.label}</p>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -314,10 +413,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       body: { ...customization.body, breastSize: option.value as any }
                     })}
-                    className={`flex-1 p-2 rounded-lg border text-xs transition-all ${
+                    className={`flex-1 py-3 rounded-xl border text-sm transition-all ${
                       customization.body.breastSize === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -336,10 +435,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       body: { ...customization.body, buttSize: option.value as any }
                     })}
-                    className={`flex-1 p-2 rounded-lg border text-xs transition-all ${
+                    className={`flex-1 py-3 rounded-xl border text-sm transition-all ${
                       customization.body.buttSize === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -358,10 +457,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       body: { ...customization.body, skinTexture: option.value as any }
                     })}
-                    className={`p-2 rounded-lg border text-sm transition-all ${
+                    className={`p-3 rounded-xl border text-sm transition-all ${
                       customization.body.skinTexture === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -370,8 +469,8 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2">
+            <div className="flex gap-4 pt-2">
+              <label className="flex items-center gap-3 flex-1 p-3 rounded-xl bg-zinc-800/30 border border-zinc-700 cursor-pointer hover:border-zinc-600 transition-all">
                 <input
                   type="checkbox"
                   checked={customization.body.tattoos}
@@ -379,11 +478,11 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                     ...customization,
                     body: { ...customization.body, tattoos: e.target.checked }
                   })}
-                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-pink-500 focus:ring-pink-500"
+                  className="w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-pink-500 focus:ring-pink-500"
                 />
-                <span className="text-sm text-zinc-300">纹身</span>
+                <span className="text-sm text-zinc-300">有纹身</span>
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-3 flex-1 p-3 rounded-xl bg-zinc-800/30 border border-zinc-700 cursor-pointer hover:border-zinc-600 transition-all">
                 <input
                   type="checkbox"
                   checked={customization.body.piercings}
@@ -391,36 +490,43 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                     ...customization,
                     body: { ...customization.body, piercings: e.target.checked }
                   })}
-                  className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-pink-500 focus:ring-pink-500"
+                  className="w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-pink-500 focus:ring-pink-500"
                 />
-                <span className="text-sm text-zinc-300">穿孔</span>
+                <span className="text-sm text-zinc-300">有穿孔</span>
               </label>
             </div>
-          </div>
+          </motion.div>
         );
 
       case 3: // 性格设定
         return (
-          <div className="space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-5"
+          >
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">性格类型</label>
-              <div className="grid grid-cols-2 gap-2">
+              <label className="block text-sm font-medium text-zinc-300 mb-3">性格类型</label>
+              <div className="grid grid-cols-2 gap-3">
                 {PERSONALITY_OPTIONS.type.map((option) => (
-                  <button
+                  <motion.button
                     key={option.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setCustomization({
                       ...customization,
                       personality: { ...customization.personality, type: option.value as any }
                     })}
-                    className={`p-3 rounded-lg border text-sm transition-all ${
+                    className={`p-4 rounded-2xl border-2 text-left transition-all ${
                       customization.personality.type === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-purple-500/20'
+                        : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
                     }`}
                   >
-                    <p className="font-medium">{option.label}</p>
+                    <p className="font-medium text-white">{option.label}</p>
                     <p className="text-xs text-zinc-400 mt-1">{option.description}</p>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -435,10 +541,10 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       ...customization,
                       personality: { ...customization.personality, voice: option.value as any }
                     })}
-                    className={`p-2 rounded-lg border text-sm transition-all ${
+                    className={`p-3 rounded-xl border text-sm transition-all ${
                       customization.personality.voice === option.value
-                        ? 'border-pink-500 bg-pink-500/20'
-                        : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
                     }`}
                   >
                     {option.label}
@@ -448,7 +554,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">恋物癖/偏好 (可多选)</label>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">偏好标签 (可多选)</label>
               <div className="flex flex-wrap gap-2">
                 {KINK_OPTIONS.map((kink) => (
                   <button
@@ -462,9 +568,9 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                         preferences: { ...customization.preferences, kinks }
                       });
                     }}
-                    className={`px-3 py-1 rounded-full text-xs transition-all ${
+                    className={`px-4 py-2 rounded-full text-sm transition-all ${
                       customization.preferences.kinks.includes(kink)
-                        ? 'bg-pink-500 text-white'
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                     }`}
                   >
@@ -473,81 +579,251 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         );
 
-      case 4: // 生成角色
+      case 4: // 动作设定
         return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-white mb-2">生成你的虚拟伴侣</h3>
-              <p className="text-sm text-zinc-400">
-                根据你的设定，AI将生成一个专属的虚拟伴侣角色
-              </p>
-            </div>
-
-            {/* 角色预览 */}
-            <div className="bg-zinc-800/50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-zinc-300 mb-3">角色设定预览</h4>
-              <div className="space-y-2 text-sm text-zinc-400">
-                <p>名称: {customization.name || '未命名'}</p>
-                <p>面容: {customization.face.shape}脸, {customization.face.skinTone}肤色, {customization.face.eyeColor}眼睛</p>
-                <p>发型: {customization.face.hairColor} {customization.face.hairStyle}</p>
-                <p>身材: {customization.body.bodyType}, {customization.body.breastSize}胸部, {customization.body.buttSize}臀部</p>
-                <p>性格: {customization.personality.type}, {customization.personality.voice}声音</p>
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-5"
+          >
+            {/* 动作姿势选择 */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">角色动作</label>
+              <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                {ACTION_OPTIONS.pose.map((option) => (
+                  <motion.button
+                    key={option.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCustomization({
+                      ...customization,
+                      actions: { ...customization.actions, pose: option.value }
+                    })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      customization.actions.pose === option.value
+                        ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-purple-500/20'
+                        : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-white">{option.label}</p>
+                    <p className="text-xs text-zinc-400 mt-1 truncate">{option.description}</p>
+                  </motion.button>
+                ))}
               </div>
             </div>
 
-            {/* 生成按钮 */}
+            {/* 动作强度 */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">动作强度</label>
+              <div className="grid grid-cols-4 gap-2">
+                {ACTION_OPTIONS.intensity.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setCustomization({
+                      ...customization,
+                      actions: { ...customization.actions, intensity: option.value as any }
+                    })}
+                    className={`p-3 rounded-xl border text-sm transition-all ${
+                      customization.actions.intensity === option.value
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 场景选择 */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">场景设定</label>
+              <div className="grid grid-cols-3 gap-2">
+                {ACTION_OPTIONS.scene.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setCustomization({
+                      ...customization,
+                      actions: { ...customization.actions, scene: option.value }
+                    })}
+                    className={`p-3 rounded-xl border text-sm transition-all ${
+                      customization.actions.scene === option.value
+                        ? 'border-pink-500 bg-pink-500/20 text-white'
+                        : 'border-zinc-700 bg-zinc-800/30 text-zinc-300 hover:border-zinc-600'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 预览当前选择 */}
+            <div className="bg-zinc-800/30 rounded-2xl p-4 border border-zinc-700">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-4 h-4 text-pink-500" />
+                <h4 className="text-sm font-medium text-zinc-300">动作预览</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="bg-zinc-800/50 rounded-lg p-2">
+                  <span className="text-zinc-500">动作</span>
+                  <p className="text-white">{ACTION_OPTIONS.pose.find(p => p.value === customization.actions.pose)?.label || '-'}</p>
+                </div>
+                <div className="bg-zinc-800/50 rounded-lg p-2">
+                  <span className="text-zinc-500">强度</span>
+                  <p className="text-white">{ACTION_OPTIONS.intensity.find(i => i.value === customization.actions.intensity)?.label || '-'}</p>
+                </div>
+                <div className="bg-zinc-800/50 rounded-lg p-2">
+                  <span className="text-zinc-500">场景</span>
+                  <p className="text-white">{ACTION_OPTIONS.scene.find(s => s.value === customization.actions.scene)?.label || '-'}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 5: // 生成角色
+        return (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
             {!generatedImage && (
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:from-zinc-600 disabled:to-zinc-600 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
-              >
-                {isGenerating ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    生成中...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-5 h-5" />
-                    生成全裸角色
-                  </>
-                )}
-              </button>
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center">
+                    <Wand2 className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">准备生成你的虚拟伴侣</h3>
+                  <p className="text-sm text-zinc-400">
+                    AI 将根据你的设定生成一个专属角色
+                  </p>
+                </div>
+
+                {/* 模型选择 */}
+                <div className="bg-zinc-800/30 rounded-2xl p-4 border border-zinc-700">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">选择 AI 模型</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {NSFW_MODELS.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => setSelectedModel(model.id)}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          selectedModel === model.id
+                            ? 'border-pink-500 bg-pink-500/20'
+                            : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-white">{model.name}</p>
+                        <p className="text-xs text-zinc-400">{model.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 角色设定预览 */}
+                <div className="bg-zinc-800/30 rounded-2xl p-4 border border-zinc-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-4 h-4 text-pink-500" />
+                    <h4 className="text-sm font-medium text-zinc-300">角色设定</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">名称</span>
+                      <p className="text-white">{customization.name || '未命名'}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">性别</span>
+                      <p className="text-white">{customization.gender === 'female' ? '女性' : '男性'}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">外貌</span>
+                      <p className="text-white">{customization.face.hairColor}{customization.face.hairStyle}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">性格</span>
+                      <p className="text-white">{customization.personality.type}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">动作</span>
+                      <p className="text-white">{ACTION_OPTIONS.pose.find(p => p.value === customization.actions.pose)?.label || '-'}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <span className="text-zinc-500">场景</span>
+                      <p className="text-white">{ACTION_OPTIONS.scene.find(s => s.value === customization.actions.scene)?.label || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:from-zinc-600 disabled:to-zinc-600 text-white font-semibold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-lg shadow-pink-500/25"
+                >
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>AI 生成中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5" />
+                      <span>开始生成</span>
+                    </>
+                  )}
+                </motion.button>
+              </>
             )}
 
             {/* 生成结果 */}
             {generatedImage && (
               <div className="space-y-4">
-                <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-800">
+                <div className="text-center mb-4">
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                    <Check className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">生成成功！</h3>
+                </div>
+                
+                <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 border-4 border-pink-500/30">
                   <img
                     src={generatedImage}
                     alt="Generated avatar"
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <button
+                
+                <div className="flex gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleGenerate}
-                    className="flex-1 py-3 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-3 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     <RefreshCw className="w-4 h-4" />
                     重新生成
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleComplete}
-                    className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     <Check className="w-4 h-4" />
-                    确认使用
-                  </button>
+                    使用此角色
+                  </motion.button>
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
         );
 
       default:
@@ -557,75 +833,95 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
-      <div className="bg-zinc-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="bg-zinc-900/95 backdrop-blur-xl rounded-3xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-zinc-800"
+      >
         {/* Header */}
-        <div className="p-4 border-b border-zinc-800">
+        <div className="p-5 border-b border-zinc-800">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">创建虚拟伴侣</h2>
             <button
               onClick={onCancel}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
+              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
             >
               ✕
             </button>
           </div>
           
           {/* Progress Steps */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
             {steps.map((s, i) => (
-              <div key={i} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
-                    i < step
-                      ? 'bg-pink-500 text-white'
-                      : i === step
-                      ? 'bg-pink-500/20 text-pink-500 border border-pink-500'
-                      : 'bg-zinc-800 text-zinc-500'
+              <div key={i} className="flex flex-col items-center">
+                <motion.div
+                  animate={{
+                    scale: i === step ? 1.1 : 1,
+                    backgroundColor: i < step ? '#ec4899' : i === step ? 'rgba(236,72,153,0.2)' : 'rgba(39,39,42,0.5)'
+                  }}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    i === step ? 'ring-2 ring-pink-500 ring-offset-2 ring-offset-zinc-900' : ''
                   }`}
                 >
-                  {i < step ? <Check className="w-4 h-4" /> : <s.icon className="w-4 h-4" />}
-                </div>
+                  {i < step ? (
+                    <Check className="w-5 h-5 text-white" />
+                  ) : (
+                    <s.icon className={`w-5 h-5 ${i === step ? 'text-pink-500' : 'text-zinc-500'}`} />
+                  )}
+                </motion.div>
                 {i < steps.length - 1 && (
-                  <div className={`w-8 h-0.5 mx-1 ${i < step ? 'bg-pink-500' : 'bg-zinc-800'}`} />
+                  <div className={`hidden sm:block w-8 h-0.5 mt-2 ${i < step ? 'bg-pink-500' : 'bg-zinc-700'}`} />
                 )}
               </div>
             ))}
           </div>
+          
+          {/* Current Step Title */}
+          <div className="mt-4 text-center">
+            <h3 className="text-lg font-semibold text-white">{steps[step].title}</h3>
+            <p className="text-sm text-zinc-400">{steps[step].subtitle}</p>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <h3 className="text-lg font-semibold text-white mb-4">{steps[step].title}</h3>
-          {renderStep()}
+        <div className="flex-1 overflow-y-auto p-5">
+          <AnimatePresence mode="wait">
+            {renderStep()}
+          </AnimatePresence>
         </div>
 
         {/* Footer */}
         {step < steps.length - 1 && (
-          <div className="p-4 border-t border-zinc-800 flex gap-2">
+          <div className="p-5 border-t border-zinc-800 flex gap-3">
             {step > 0 && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handlePrev}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-4 h-4" />
                 上一步
-              </button>
+              </motion.button>
             )}
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleNext}
-              className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25"
             >
               下一步
               <ChevronRight className="w-4 h-4" />
-            </button>
+            </motion.button>
           </div>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

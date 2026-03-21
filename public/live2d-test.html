@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live2D Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.2.4/dist/pixi.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+    <style>
+        body { margin: 0; background: #1a1a1a; }
+        #container { width: 800px; height: 600px; margin: 20px auto; border: 1px solid #333; }
+        .info { color: white; text-align: center; padding: 10px; }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>Live2D Debug Test</h2>
+        <p>Model: /models/mao/model.model3.json</p>
+        <button onclick="loadModel()">Load Model</button>
+        <button onclick="loadTexture()">Test Texture Only</button>
+        <div id="status"></div>
+    </div>
+    <div id="container"></div>
+    
+    <script>
+        let app, model;
+        const status = document.getElementById('status');
+        
+        // Initialize PixiJS
+        async function init() {
+            app = new PIXI.Application({
+                width: 800,
+                height: 600,
+                backgroundColor: 0x1a1a1a,
+                events: false, // Disable event system
+            });
+            document.getElementById('container').appendChild(app.view);
+            status.innerHTML = '✅ PixiJS initialized';
+        }
+        
+        // Load Live2D model
+        async function loadModel() {
+            try {
+                status.innerHTML = '🔄 Loading model...';
+                model = await Live2DModel.from('/models/mao/model.model3.json', {
+                    autoInteract: false,
+                });
+                
+                model.anchor.set(0.5);
+                model.x = 400;
+                model.y = 300;
+                model.scale.set(0.5);
+                
+                app.stage.addChild(model);
+                
+                status.innerHTML = `✅ Model loaded!<br>
+                    Size: ${model.width}x${model.height}<br>
+                    Internal: ${!!model.internalModel}<br>
+                    Core: ${!!model.internalModel?.coreModel}`;
+                
+                // Animate
+                app.ticker.add(() => {
+                    model.update(0.016);
+                });
+            } catch(e) {
+                status.innerHTML = '❌ Error: ' + e.message;
+                console.error(e);
+            }
+        }
+        
+        // Test texture loading only
+        async function loadTexture() {
+            try {
+                const texture = await PIXI.Assets.load('/models/mao/textures/texture_00.png');
+                const sprite = new PIXI.Sprite(texture);
+                sprite.x = 100;
+                sprite.y = 100;
+                sprite.scale.set(0.5);
+                app.stage.addChild(sprite);
+                status.innerHTML = '✅ Texture loaded: ' + texture.width + 'x' + texture.height;
+            } catch(e) {
+                status.innerHTML = '❌ Texture error: ' + e.message;
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>
