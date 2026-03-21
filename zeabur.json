@@ -4,10 +4,7 @@
     "command": "npm run build"
   },
   "start": {
-    "command": "npm run start",
+    "command": "node server.js",
     "port": 3000
-  },
-  "environment": [
-    "NODE_ENV=production"
-  ]
+  }
 }
