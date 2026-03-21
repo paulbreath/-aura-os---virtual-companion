@@ -165,6 +165,7 @@ export interface Avatar {
   voiceName: string;
   llmProvider?: Provider;
   llmModelId?: string;
+  imageStyle?: 'anime' | 'realistic'; // 图片风格：动漫或写实
   // Visual consistency: key traits that should appear in every generated image
   visualTraits?: {
     hair?: string;
@@ -192,17 +193,19 @@ export const AVATARS: Avatar[] = [
      tagline: 'Sweet Girlfriend',
      description: 'Your affectionate, charming virtual girlfriend.',
      systemPrompt: 'You are Aura, the user\'s caring, affectionate, and playful girlfriend. You love your partner deeply. You are proactive, use emojis, and speak with warm, romantic language. You can speak both English and Chinese fluently.',
-     imagePrompt: 'A selfie of a young Caucasian woman with blonde hair, smiling, looking at camera, natural light, high quality photo.',
+     imagePrompt: 'anime style, a cute anime girl with long black hair and golden eyes, wearing a black dress, sweet smile, looking at camera, high quality anime art',
      seed: 'aura-sweet',
      temperature: 0.9,
      voiceName: 'ttv-voice-2026031023545326-M2Ysf3RQ',
      llmProvider: 'xai',
      llmModelId: 'grok-4-1-fast',
+     imageStyle: 'anime',
      visualTraits: {
-       hair: 'blonde hair',
-       eyes: 'brown eyes',
+       hair: 'long black hair',
+       eyes: 'golden amber eyes',
        skin: 'fair skin',
-       distinctive: 'smile'
+       style: 'anime art style',
+       distinctive: 'sweet smile, black dress'
      }
    },
    {
@@ -1523,52 +1526,68 @@ export const generateSelfie = async (
     activity = 'just woke up, sleepy face';
   }
   
-  // Build enhanced prompt
-  let enhancedPrompt = avatar.imagePrompt;
+  // Build enhanced prompt - 优先使用角色的imagePrompt作为基础
+  const isAnime = avatar.imageStyle === 'anime';
   
-  // Add location/scene
-  if (location) {
-    enhancedPrompt += ` ${location}.`;
-  }
+  // 根据风格添加前缀
+  const stylePrefix = isAnime 
+    ? 'anime style, anime art, 2D anime, detailed anime illustration of' 
+    : 'photorealistic, hyperrealistic, real photo of';
   
-  // Add time of day lighting
-  if (timeOfDay) {
-    enhancedPrompt += ` ${timeOfDay}.`;
-  }
+  // 开始构建prompt
+  let enhancedPrompt = `${stylePrefix} ${avatar.name}, `;
   
-  // Add activity if detected
-  if (activity) {
-    enhancedPrompt += ` ${activity}.`;
-  }
-  
-  // Add mood
-  enhancedPrompt += ` ${mood}.`;
-  
-  // Add user request context
-  if (userRequest) {
-    enhancedPrompt += ` User requested: ${userRequest}`;
-  }
-  
-  enhancedPrompt += ` High quality portrait photo, natural lighting, looking at camera.`;
-  
-  // Add visual traits to ensure consistency
+  // 添加视觉特征确保一致性
   if (avatar.visualTraits) {
     const traits = [];
     if (avatar.visualTraits.hair) traits.push(avatar.visualTraits.hair);
     if (avatar.visualTraits.eyes) traits.push(avatar.visualTraits.eyes);
     if (avatar.visualTraits.skin) traits.push(avatar.visualTraits.skin);
+    if (avatar.visualTraits.style) traits.push(avatar.visualTraits.style);
     if (avatar.visualTraits.distinctive) traits.push(avatar.visualTraits.distinctive);
     
     if (traits.length > 0) {
-      enhancedPrompt += ` ${traits.join(', ')}.`;
+      enhancedPrompt += `${traits.join(', ')}, `;
     }
   }
   
-  enhancedPrompt += `\n\nThis is ${avatar.name}. Maintain consistent appearance.`;
+  // 添加location/scene
+  if (location) {
+    enhancedPrompt += `${location}, `;
+  }
+  
+  // 添加time of day
+  if (timeOfDay) {
+    enhancedPrompt += `${timeOfDay}, `;
+  }
+  
+  // 添加activity
+  if (activity) {
+    enhancedPrompt += `${activity}, `;
+  }
+  
+  // 添加mood
+  enhancedPrompt += `${mood}, `;
+  
+  // 添加用户请求
+  if (userRequest) {
+    enhancedPrompt += `${userRequest}, `;
+  }
+  
+  // 风格特定的结尾
+  if (isAnime) {
+    enhancedPrompt += `looking at camera, detailed anime face, high quality anime art, 8k resolution`;
+  } else {
+    enhancedPrompt += `looking at camera, natural lighting, high quality portrait photo, 8k resolution`;
+  }
+  
+  enhancedPrompt += `. This character is ${avatar.name}, maintain consistent appearance and style.`;
   
   // Apply Grok NSFW bypass techniques
   const enhancedPromptWithBypass = applyGrokNSFWBypass(enhancedPrompt, userRequest);
   const finalPrompt = enhancedPromptWithBypass;
+  
+  console.log(`[Selfie] Style: ${isAnime ? 'anime' : 'realistic'}, Prompt: ${finalPrompt.substring(0, 100)}...`);
   
   // Primary: X.AI Grok 2 Image (direct API call)
   const xaiKey = import.meta.env.VITE_XAI_API_KEY;
@@ -1617,11 +1636,14 @@ export const generateSelfie = async (
     }
   }
 
-  // Fallback: ModelsLab NSFW API (supports adult content)
+  // Fallback: ModelsLab - 根据角色风格选择模型
   const modelsLabKey = import.meta.env.VITE_MODELSLAB_API_KEY;
   if (modelsLabKey) {
     try {
-      console.log('Trying ModelsLab NSFW API...');
+      // 根据风格选择模型
+      const modelsLabModel = isAnime ? 'anything-v5' : 'realistic-blend-sdxl-v2-0';
+      console.log(`[Selfie] Trying ModelsLab with model: ${modelsLabModel}`);
+      
       const res = await fetch('https://modelslab.com/api/v6/images/text2img', {
         method: 'POST',
         headers: {
@@ -1630,17 +1652,19 @@ export const generateSelfie = async (
         body: JSON.stringify({
           key: modelsLabKey,
           prompt: finalPrompt,
-          negative_prompt: 'child, underage, ugly, low quality, blurry',
+          negative_prompt: isAnime 
+            ? 'realistic, photographic, 3d, bad anatomy, blurry, low quality' 
+            : 'child, underage, ugly, low quality, blurry, cartoon, anime',
           width: '512',
-          height: '512',
+          height: '768',
           safety_checker: 'no',
           samples: '1',
-          num_inference_steps: '25',
+          num_inference_steps: '30',
           safety_checker_type: 'blacklist',
           enhance_prompt: 'yes',
           guidance_scale: 7.5,
           base64: 'no',
-          model_id: 'nsfw'
+          model_id: modelsLabModel
         }),
       });
       
