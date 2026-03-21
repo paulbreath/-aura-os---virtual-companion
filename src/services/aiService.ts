@@ -1528,6 +1528,7 @@ export const generateSelfie = async (
   
   // Build enhanced prompt - 优先使用角色的imagePrompt作为基础
   const isAnime = avatar.imageStyle === 'anime';
+  console.log(`[Selfie] Character: ${avatar.name}, imageStyle: ${avatar.imageStyle}, isAnime: ${isAnime}`);
   
   // 根据风格添加前缀
   const stylePrefix = isAnime 
