@@ -1607,9 +1607,9 @@ export const generateSelfie = async (
       // Add NSFW bypass parameters if detected
       if (userRequest && userRequest.toLowerCase().match(/nude|naked|sex|porn|erotic|裸|性/)) {
         console.log('🔞 NSFW request detected, applying enhanced bypass...');
-        // Add style modifiers that help bypass
+        // Add style modifiers that help bypass (quality: low/medium/high)
         xaiBody.style = 'artistic';
-        xaiBody.quality = 'hd';
+        xaiBody.quality = 'high';
       }
       
       const xaiRes = await fetch('https://api.x.ai/v1/images/generations', {
@@ -1636,73 +1636,55 @@ export const generateSelfie = async (
     }
   }
 
-  // Fallback: ModelsLab - 根据角色风格选择模型
+  // Fallback: ModelsLab - 通过后端代理调用（避免CORS问题）
   const modelsLabKey = import.meta.env.VITE_MODELSLAB_API_KEY;
   if (modelsLabKey) {
     try {
       // 根据风格选择模型
       const modelsLabModel = isAnime ? 'anything-v5' : 'realistic-blend-sdxl-v2-0';
-      console.log(`[Selfie] Trying ModelsLab with model: ${modelsLabModel}`);
+      console.log(`[Selfie] Trying ModelsLab via proxy with model: ${modelsLabModel}`);
       
-      const res = await fetch('https://modelslab.com/api/v6/images/text2img', {
+      // 通过后端代理调用
+      const res = await fetch('/api/modelslab', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          key: modelsLabKey,
+          model_id: modelsLabModel,
           prompt: finalPrompt,
           negative_prompt: isAnime 
             ? 'realistic, photographic, 3d, bad anatomy, blurry, low quality' 
             : 'child, underage, ugly, low quality, blurry, cartoon, anime',
-          width: '512',
-          height: '768',
-          safety_checker: 'no',
-          samples: '1',
-          num_inference_steps: '30',
-          safety_checker_type: 'blacklist',
-          enhance_prompt: 'yes',
-          guidance_scale: 7.5,
-          base64: 'no',
-          model_id: modelsLabModel
+          width: 512,
+          height: 768,
         }),
       });
       
       if (res.ok) {
         const data = await res.json();
-        if (data.future_links && data.future_links[0]) {
-          const imageUrl = data.future_links[0];
-          const imgRes = await fetch(imageUrl);
-          const blob = await imgRes.blob();
-          const buffer = await blob.arrayBuffer();
-          const base64 = btoa(
-            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
-          return `data:image/jpeg;base64,${base64}`;
+        console.log(`[Selfie] ModelsLab response:`, data.status);
+        
+        if (data.status === 'success') {
+          // 检查所有可能的图片URL字段
+          const imageUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
+          if (imageUrl) {
+            const imgRes = await fetch(imageUrl);
+            const blob = await imgRes.blob();
+            const buffer = await blob.arrayBuffer();
+            const base64 = btoa(
+              new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            return `data:image/jpeg;base64,${base64}`;
+          }
+          if (data.images?.[0]) {
+            return `data:image/png;base64,${data.images[0]}`;
+          }
         }
       }
     } catch (error) {
-      console.error('ModelsLab NSFW API failed:', error);
+      console.error('ModelsLab via proxy failed:', error);
     }
-  }
-  
-  // Last Fallback: Pollinations.ai
-  try {
-    const seed = Date.now();
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
-    const response = await fetch(pollinationsUrl, { 
-      cache: 'no-store' 
-    });
-    if (response.ok) {
-      const blob = await response.blob();
-      const buffer = await blob.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-      return `data:image/png;base64,${base64}`;
-    }
-  } catch (error) {
-    console.warn("Pollinations.ai failed:", error);
   }
 
   console.error("All image generation methods failed");
