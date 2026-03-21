@@ -6,9 +6,10 @@ import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 
 dotenv.config();
+dotenv.config({ path: '.env.local', override: true }); // 读取 .env.local 并覆盖
 
 const app = express();
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 5174;
 
 // Rate limiting
 const limiter = rateLimit({
@@ -157,6 +158,63 @@ app.post('/api/modelslab/poll', async (req, res) => {
   }
 });
 
+// X.AI Grok Imagine API代理
+app.post('/api/xai/image', async (req, res) => {
+  const { prompt, model = 'grok-imagine-image' } = req.body;  // 正确的模型名称
+  const apiKey = process.env.XAI_API_KEY || process.env.VITE_XAI_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(400).json({ status: 'error', message: 'X.AI API key not configured. Add XAI_API_KEY or VITE_XAI_API_KEY to .env file.' });
+  }
+  
+  if (!prompt) {
+    return res.status(400).json({ status: 'error', message: 'Prompt is required' });
+  }
+  
+  console.log(`[${new Date().toISOString()}] X.AI Grok Imagine: model=${model}, prompt length=${prompt.length}`);
+  
+  try {
+    const response = await fetch('https://api.x.ai/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        prompt: prompt,
+        n: 1,
+        response_format: 'url',
+      }),
+    });
+    
+    console.log(`[${new Date().toISOString()}] X.AI response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[${new Date().toISOString()}] X.AI error: ${errorText}`);
+      return res.status(response.status).json({ status: 'error', message: errorText });
+    }
+    
+    const data = await response.json();
+    console.log(`[${new Date().toISOString()}] X.AI response:`, JSON.stringify(data).substring(0, 200));
+    
+    if (data.data && data.data[0]?.url) {
+      res.json({ 
+        status: 'success', 
+        output: [data.data[0].url],
+        model: model
+      });
+    } else {
+      res.status(500).json({ status: 'error', message: 'No image URL returned from X.AI' });
+    }
+    
+  } catch (error) {
+    console.error('X.AI API error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 app.post('/api/generate-image', async (req, res) => {
   const { prompt } = req.body;
   
@@ -168,7 +226,7 @@ app.post('/api/generate-image', async (req, res) => {
     return res.status(400).json({ error: 'Prompt too long (max 1000 characters)' });
   }
 
-  const xaiKey = process.env.XAI_API_KEY;
+  const xaiKey = process.env.XAI_API_KEY || process.env.VITE_XAI_API_KEY;
   const falKey = process.env.FAL_API_KEY;
 
   console.log(`[${new Date().toISOString()}] Generating image, prompt length: ${prompt.length}`);
@@ -301,7 +359,7 @@ if (fs.existsSync(distPath)) {
   console.warn('dist directory not found, skipping static file serving');
 }
 
-const xaiKey = process.env.XAI_API_KEY;
+const xaiKey = process.env.XAI_API_KEY || process.env.VITE_XAI_API_KEY;
 const falKey = process.env.FAL_API_KEY;
 const modelsLabKey = process.env.MODELSLAB_API_KEY || process.env.VITE_MODELSLAB_API_KEY;
 

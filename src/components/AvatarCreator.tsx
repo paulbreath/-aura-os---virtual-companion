@@ -31,14 +31,17 @@ interface AvatarCreatorProps {
   onCancel: () => void;
 }
 
-// ModelsLab 可用 NSFW 模型（已测试）
-const NSFW_MODELS = [
-  { id: 'realistic-blend-sdxl-v2-0', name: '⭐ Realistic Blend (推荐)', desc: '写实风格，即时生成' },
-  { id: 'anime-diffusion', name: '⭐ Anime Diffusion', desc: '动漫风格，即时生成' },
-  { id: 'anything-v3', name: 'Anything V3', desc: '动漫风格，即时生成' },
-  { id: 'waifu-diffusion', name: 'Waifu Diffusion', desc: '动漫风格，异步生成' },
-  { id: 'anything-v5', name: 'Anything V5', desc: '动漫风格，异步生成' },
-  { id: 'nsfw', name: 'NSFW', desc: '写实成人模型，异步生成' },
+// 图像生成模型配置
+const IMAGE_MODELS = [
+  // ModelsLab 模型
+  { id: 'realistic-blend-sdxl-v2-0', name: '⭐ Realistic Blend (推荐)', desc: '写实风格，即时生成', provider: 'modelslab', nsfw: true },
+  { id: 'anime-diffusion', name: '⭐ Anime Diffusion', desc: '动漫风格，即时生成', provider: 'modelslab', nsfw: true },
+  { id: 'anything-v3', name: 'Anything V3', desc: '动漫风格，即时生成', provider: 'modelslab', nsfw: true },
+  { id: 'waifu-diffusion', name: 'Waifu Diffusion', desc: '动漫风格，异步生成', provider: 'modelslab', nsfw: true },
+  { id: 'anything-v5', name: 'Anything V5', desc: '动漫风格，异步生成', provider: 'modelslab', nsfw: true },
+  { id: 'nsfw', name: 'NSFW', desc: '写实成人模型，异步生成', provider: 'modelslab', nsfw: true },
+  // X.AI Grok Imagine
+  { id: 'grok-imagine-image', name: '🌟 Grok Imagine', desc: 'X.AI 生成，高质量写实', provider: 'xai', nsfw: false },
 ];
 
 export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorProps) {
@@ -75,45 +78,78 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
       const prompt = generateNSFWAvatarPrompt(customization);
       console.log('Generating avatar with prompt:', prompt);
       
-      // 使用后端代理API（避免CORS问题）
-      const response = await fetch('/api/modelslab', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model_id: selectedModel,
-          prompt: prompt,
-          negative_prompt: 'child, underage, ugly, deformed, blurry, low quality, cartoon, 3d, painting, drawing, worst quality, low quality, watermark, text',
-          width: 512,
-          height: 768,
-        }),
-      });
-
-      const data = await response.json();
-      console.log('[ModelsLab] API Response:', data);
-      console.log('[ModelsLab] Status:', data.status);
+      // 获取选中的模型配置
+      const modelConfig = IMAGE_MODELS.find(m => m.id === selectedModel);
+      if (!modelConfig) {
+        alert('请选择一个模型');
+        setIsGenerating(false);
+        return;
+      }
       
-      if (data.status === 'success') {
-        // 检查所有可能的图片URL字段
-        const imageUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
-        if (imageUrl) {
-          console.log('[ModelsLab] ✅ Got image:', imageUrl);
-          setGeneratedImage(imageUrl);
-        } else if (data.images?.[0]) {
-          console.log('[ModelsLab] ✅ Got base64 image');
-          setGeneratedImage(`data:image/png;base64,${data.images[0]}`);
+      let response: Response;
+      let data: any;
+      
+      if (modelConfig.provider === 'xai') {
+        // 使用 X.AI Grok Imagine API
+        console.log('[X.AI] Using Grok Imagine...');
+        response = await fetch('/api/xai/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: selectedModel,
+            prompt: prompt,
+          }),
+        });
+        data = await response.json();
+        console.log('[X.AI] API Response:', data);
+        
+        if (data.status === 'success' && data.output?.[0]) {
+          console.log('[X.AI] ✅ Got image:', data.output[0]);
+          setGeneratedImage(data.output[0]);
+        } else if (data.status === 'error') {
+          console.error('[X.AI] ❌ API Error:', data.message);
+          alert('生成失败: ' + data.message);
         } else {
-          console.error('[ModelsLab] ❌ Success but no image:', data);
-          alert('生成失败: 服务器返回成功但未提供图片');
+          console.error('[X.AI] ❌ Unknown response:', data);
+          alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
         }
-      } else if (data.status === 'error') {
-        const errorMsg = data.message || data.messege || '未知错误';
-        console.error('[ModelsLab] ❌ API Error:', errorMsg);
-        alert('生成失败: ' + errorMsg);
       } else {
-        console.error('[ModelsLab] ❌ Unknown response:', data);
-        alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
+        // 使用 ModelsLab API
+        console.log('[ModelsLab] Using model:', selectedModel);
+        response = await fetch('/api/modelslab', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model_id: selectedModel,
+            prompt: prompt,
+            negative_prompt: 'child, underage, ugly, deformed, blurry, low quality, cartoon, 3d, painting, drawing, worst quality, low quality, watermark, text',
+            width: 512,
+            height: 768,
+          }),
+        });
+        data = await response.json();
+        console.log('[ModelsLab] API Response:', data);
+        
+        if (data.status === 'success') {
+          const imageUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
+          if (imageUrl) {
+            console.log('[ModelsLab] ✅ Got image:', imageUrl);
+            setGeneratedImage(imageUrl);
+          } else if (data.images?.[0]) {
+            console.log('[ModelsLab] ✅ Got base64 image');
+            setGeneratedImage(`data:image/png;base64,${data.images[0]}`);
+          } else {
+            console.error('[ModelsLab] ❌ Success but no image:', data);
+            alert('生成失败: 服务器返回成功但未提供图片');
+          }
+        } else if (data.status === 'error') {
+          const errorMsg = data.message || data.messege || '未知错误';
+          console.error('[ModelsLab] ❌ API Error:', errorMsg);
+          alert('生成失败: ' + errorMsg);
+        } else {
+          console.error('[ModelsLab] ❌ Unknown response:', data);
+          alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
+        }
       }
     } catch (error) {
       console.error('Failed to generate avatar:', error);
@@ -710,7 +746,7 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                 <div className="bg-zinc-800/30 rounded-2xl p-4 border border-zinc-700">
                   <label className="block text-sm font-medium text-zinc-300 mb-2">选择 AI 模型</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {NSFW_MODELS.map((model) => (
+                    {IMAGE_MODELS.map((model) => (
                       <button
                         key={model.id}
                         onClick={() => setSelectedModel(model.id)}
@@ -722,6 +758,9 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                       >
                         <p className="text-sm font-medium text-white">{model.name}</p>
                         <p className="text-xs text-zinc-400">{model.desc}</p>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          {model.provider === 'xai' ? 'X.AI API' : 'ModelsLab'}
+                        </p>
                       </button>
                     ))}
                   </div>
