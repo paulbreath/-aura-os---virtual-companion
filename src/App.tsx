@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
 import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext } from './services/memoryService';
 import { live2dService } from './services/live2dService';
-import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus } from 'lucide-react';
+import { addToAlbum } from './types/album';
+import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus, GalleryHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AvatarCreator from './components/AvatarCreator';
 import Live2DCharacter from './components/Live2DCharacter';
 import VoiceChat from './components/VoiceChat';
+import CharacterAlbum from './components/CharacterAlbum';
 
 export default function App() {
   const [startTime] = useState(Date.now());
@@ -44,6 +46,7 @@ export default function App() {
   const [selectedMentionTarget, setSelectedMentionTarget] = useState<'all' | Avatar | null>(null);
   const [selfieMode, setSelfieMode] = useState(false);
   const [showAvatarCreator, setShowAvatarCreator] = useState(false);
+  const [showAlbum, setShowAlbum] = useState(false);
   const [lastGroupSpeakerTime, setLastGroupSpeakerTime] = useState<number>(0);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
@@ -435,6 +438,15 @@ export default function App() {
         const imageUrl = await generateSelfie(currentAvatar, recentContext, userPrompt, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
 
         if (imageUrl) {
+          // 保存到角色相册
+          addToAlbum(currentAvatar.id, imageUrl, {
+            prompt: userPrompt || '自拍',
+            type: 'selfie',
+            metadata: {
+              scene: recentContext.slice(-100)
+            }
+          });
+          
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
             role: 'model',
@@ -1430,6 +1442,13 @@ export default function App() {
                 >
                   <Camera size={20} />
                 </button>
+                <button
+                  onClick={() => setShowAlbum(true)}
+                  className="p-3 text-zinc-400 hover:text-pink-400 hover:bg-zinc-800 rounded-full transition-all"
+                  title="View Album"
+                >
+                  <GalleryHorizontal size={20} />
+                </button>
                 {getAvatarImage(currentAvatar.id) && (
                   <button
                     onClick={handleClearCustomAvatar}
@@ -1550,6 +1569,14 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Character Album */}
+      <CharacterAlbum
+        avatarId={currentAvatar.id}
+        avatarName={currentAvatar.name}
+        isOpen={showAlbum}
+        onClose={() => setShowAlbum(false)}
+      />
     </div>
   );
 }
