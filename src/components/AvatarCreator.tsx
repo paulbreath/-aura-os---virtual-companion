@@ -106,21 +106,25 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
         if (data.status === 'success' && data.output?.[0]) {
           console.log('[X.AI] ✅ Got image:', data.output[0]);
           setGeneratedImage(data.output[0]);
-        } else if (data.status === 'error') {
-          console.error('[X.AI] ❌ API Error:', data.message);
-          alert('生成失败: ' + data.message);
+          return; // 成功，直接返回
         } else {
-          console.error('[X.AI] ❌ Unknown response:', data);
-          alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
+          // X.AI 失败，自动回退到 ModelsLab
+          console.log('[X.AI] ❌ Failed:', data.message, '- Falling back to ModelsLab...');
         }
-      } else {
-        // 使用 ModelsLab API
-        console.log('[ModelsLab] Using model:', selectedModel);
+      } 
+      
+      // ModelsLab (X.AI失败时的回退，或者直接选择ModelsLab)
+      {
+        // 根据角色风格选择合适的ModelsLab模型
+        const fallbackModel = customization.style === 'anime' ? 'anything-v5' : 'realistic-blend-sdxl-v2-0';
+        const modelsLabModel = modelConfig.provider === 'xai' ? fallbackModel : selectedModel;
+        
+        console.log(`[ModelsLab] Falling back to model: ${modelsLabModel} (style: ${customization.style})`);
         response = await fetch('/api/modelslab', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model_id: selectedModel,
+            model_id: modelsLabModel,
             prompt: prompt,
             negative_prompt: 'child, underage, ugly, deformed, blurry, low quality, cartoon, 3d, painting, drawing, worst quality, low quality, watermark, text',
             width: 512,
