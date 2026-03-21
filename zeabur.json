@@ -1,0 +1,13 @@
+{
+  "name": "aura-os",
+  "build": {
+    "command": "npm run build"
+  },
+  "start": {
+    "command": "npm run start",
+    "port": 3000
+  },
+  "environment": [
+    "NODE_ENV=production"
+  ]
+}
