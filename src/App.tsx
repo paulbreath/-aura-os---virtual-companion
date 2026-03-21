@@ -47,6 +47,9 @@ export default function App() {
   const [selfieMode, setSelfieMode] = useState(false);
   const [showAvatarCreator, setShowAvatarCreator] = useState(false);
   const [showAlbum, setShowAlbum] = useState(false);
+  const [chatBackground, setChatBackground] = useState<string | null>(() => {
+    return localStorage.getItem('aura-chat-background') || null;
+  });
   const [lastGroupSpeakerTime, setLastGroupSpeakerTime] = useState<number>(0);
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     const model = getPreferredModel();
@@ -718,6 +721,9 @@ export default function App() {
       ...prev,
       [avatarId]: imageUrl
     }));
+    // 同时设置为聊天背景
+    setChatBackground(imageUrl);
+    localStorage.setItem('aura-chat-background', imageUrl);
   };
 
   const handleRemoveBackground = (avatarId: string) => {
@@ -1069,7 +1075,15 @@ export default function App() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <div 
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 transition-all duration-300"
+          style={chatBackground ? {
+            backgroundImage: `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url(${chatBackground})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          } : {}}
+        >
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
               <motion.div
