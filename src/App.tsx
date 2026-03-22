@@ -1409,11 +1409,53 @@ export default function App() {
               </div>
               <div className="flex-1 p-4">
                 <VoiceChat 
-                  onTranscript={(text) => {
+                  onTranscript={async (text) => {
                     console.log('Voice transcript:', text);
-                    // 可以在这里处理语音转文字的结果
-                    // 例如自动发送消息
-                    setInput(text);
+                    if (!text.trim()) return;
+                    
+                    // 创建用户消息
+                    const requestMsg: Message = {
+                      id: Date.now().toString(),
+                      role: 'user',
+                      content: text,
+                      timestamp: new Date(),
+                      source: 'direct'
+                    };
+                    
+                    // 添加到消息列表
+                    const newMessages = [...messages, requestMsg];
+                    setMessages(newMessages);
+                    setIsTyping(true);
+                    
+                    try {
+                      // 生成AI回复
+                      const memoryContext = generateMemoryContext(userMemory);
+                      const aiResponse = await generateResponse(newMessages, currentAvatar, chatMode === 'group', chatMode === 'group' ? groupMembers : [], memoryContext);
+                      
+                      const modelMessage: Message = {
+                        id: (Date.now() + 1).toString(),
+                        role: 'model',
+                        content: aiResponse,
+                        timestamp: new Date(),
+                        source: 'direct',
+                        senderId: currentAvatar.id,
+                        senderName: currentAvatar.name
+                      };
+                      setMessages(prev => [...prev, modelMessage]);
+                      
+                      // 语音播放回复
+                      if (aiResponse) {
+                        const speech = await generateSpeech(aiResponse, getAvatarVoice(currentAvatar.id));
+                        if (speech) {
+                          const audio = new Audio(`data:${speech.mimeType};base64,${speech.data}`);
+                          audio.play();
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error generating response:', error);
+                    } finally {
+                      setIsTyping(false);
+                    }
                   }}
                   onSpeaking={(speaking) => {
                     setIsVoiceSpeaking(speaking);
