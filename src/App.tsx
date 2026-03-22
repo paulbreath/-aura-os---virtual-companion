@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
+import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, generateVideo, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
 import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext, saveSelfiePreference } from './services/memoryService';
 import { live2dService } from './services/live2dService';
 import { addToAlbum } from './types/album';
@@ -99,6 +99,8 @@ export default function App() {
   const [live2DSize, setLive2DSize] = useState({ width: 288, height: 384 });
   const [isResizing, setIsResizing] = useState(false);
   const live2DRef = useRef<HTMLDivElement>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   // Live2D 空闲动画
   useEffect(() => {
@@ -506,7 +508,7 @@ export default function App() {
           response = `📊 **系统状态**\n\n- **AI模型**: Grok 4.1 Fast\n- **Live2D**: ${showLive2D ? '已启用 ✅' : '已禁用'}\n- **语音模式**: ${voiceMode ? '已启用 ✅' : '已禁用'}\n- **聊天模式**: ${chatMode === 'solo' ? '单人' : '群聊'}\n- **运行时间**: ${mins}分${secs}秒\n- **消息数量**: ${messages.length}`;
           break;
         case '/help':
-          response = `📖 **可用命令**\n\n- \`/model\` - 查看当前AI模型\n- \`/status\` - 查看系统状态\n- \`/clear\` - 清除聊天记录\n- \`/memory\` - 查看用户记忆\n- \`/help\` - 显示帮助信息`;
+          response = `📖 **可用命令**\n\n- \`/model\` - 查看当前AI模型\n- \`/status\` - 查看系统状态\n- \`/clear\` - 清除聊天记录\n- \`/memory\` - 查看用户记忆\n- \`/video\` - 生成角色视频\n- \`/help\` - 显示帮助信息`;
           break;
         case '/clear':
           setMessages([{
@@ -525,6 +527,54 @@ export default function App() {
           const prefs = Object.keys(userMemory.preferences || {}).length;
           response = `🧠 **用户记忆**\n\n- **记忆条数**: ${memCount}\n- **偏好设置**: ${prefs}\n\n记忆帮助我更好地了解你～`;
           break;
+        case '/video':
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'model',
+            content: '🎬 正在为你生成视频，请稍候...',
+            timestamp: new Date(),
+            source: 'direct',
+            senderId: currentAvatar.id,
+            senderName: currentAvatar.name
+          }]);
+          
+          (async () => {
+            try {
+              const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+              const context = lastUserMessage?.content || 'beautiful scene';
+              const videoUrl = await generateVideo(currentAvatar, context, 'flirty');
+              
+              if (videoUrl) {
+                setGeneratedVideoUrl(videoUrl);
+                setShowVideoPlayer(true);
+                setMessages(prev => [...prev, {
+                  id: Date.now().toString(),
+                  role: 'model',
+                  content: '✨ 视频生成完成！点击下方播放...',
+                  timestamp: new Date(),
+                  source: 'direct',
+                  senderId: currentAvatar.id,
+                  senderName: currentAvatar.name,
+                  videoUrl: videoUrl
+                }]);
+              } else {
+                setMessages(prev => [...prev, {
+                  id: Date.now().toString(),
+                  role: 'model',
+                  content: '😅 抱歉，视频生成失败了，请稍后再试...',
+                  timestamp: new Date(),
+                  source: 'direct',
+                  senderId: currentAvatar.id,
+                  senderName: currentAvatar.name
+                }]);
+              }
+            } catch (error) {
+              console.error('Video generation error:', error);
+            }
+          })();
+          
+          setInput('');
+          return;
         default:
           response = `❓ 未知命令: \`${cmd}\`\n输入 \`/help\` 查看可用命令`;
       }
@@ -1137,6 +1187,27 @@ export default function App() {
                          )}
                        </div>
                        )}
+
+                      {msg.videoUrl && (
+                        <div 
+                          className="rounded-2xl overflow-hidden border border-zinc-700/50 shadow-lg max-w-sm cursor-pointer"
+                          onClick={() => {
+                            setGeneratedVideoUrl(msg.videoUrl!);
+                            setShowVideoPlayer(true);
+                          }}
+                        >
+                          <video
+                            src={msg.videoUrl}
+                            className="w-full h-auto object-cover"
+                            muted
+                            playsInline
+                          />
+                          <div className="p-2 bg-zinc-900/80 flex justify-center items-center gap-2">
+                            <PlayCircle size={16} className="text-indigo-400" />
+                            <span className="text-xs font-medium text-indigo-300">点击播放</span>
+                          </div>
+                        </div>
+                      )}
                       
                       {msg.content && (
                         <div className={`px-4 py-3 rounded-2xl shadow-sm relative group ${
@@ -1644,6 +1715,56 @@ export default function App() {
         isOpen={showAlbum}
         onClose={() => setShowAlbum(false)}
       />
+
+      {/* Video Player Modal */}
+      <AnimatePresence>
+        {showVideoPlayer && generatedVideoUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowVideoPlayer(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-2xl w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowVideoPlayer(false)}
+                className="absolute -top-10 right-0 text-white hover:text-zinc-300 text-xl"
+              >
+                ✕ 关闭
+              </button>
+              <video
+                src={generatedVideoUrl}
+                controls
+                autoPlay
+                loop
+                className="w-full rounded-2xl shadow-2xl"
+              />
+              <div className="mt-4 flex gap-3 justify-center">
+                <a
+                  href={generatedVideoUrl}
+                  download="aura-video.mp4"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm"
+                >
+                  下载视频
+                </a>
+                <button
+                  onClick={() => setShowVideoPlayer(false)}
+                  className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-sm"
+                >
+                  关闭
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

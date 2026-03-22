@@ -15,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # Expose port
-EXPOSE 3000
+EXPOSE 5174
 
 # Start server
 CMD ["node", "server.js"]

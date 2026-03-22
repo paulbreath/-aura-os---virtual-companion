@@ -12,7 +12,10 @@ import {
   RefreshCw,
   Wand2,
   Star,
-  Zap
+  Zap,
+  Video,
+  Play,
+  Loader2
 } from 'lucide-react';
 import {
   AvatarCustomization,
@@ -50,6 +53,9 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('realistic-blend-sdxl-v2-0');
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<string>('');
 
   const steps = [
     { title: '基本信息', subtitle: '给她取个名字', icon: User, color: 'from-pink-500 to-rose-500' },
@@ -160,6 +166,66 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
       alert('生成失败: ' + (error instanceof Error ? error.message : '网络错误，请确保服务器正在运行'));
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!generatedImage) {
+      alert('请先生成图片');
+      return;
+    }
+
+    setIsGeneratingVideo(true);
+    setVideoStatus('正在生成视频...');
+    
+    try {
+      const prompt = generateNSFWAvatarPrompt(customization);
+      console.log('Generating video with prompt:', prompt);
+      
+      // 根据角色风格选择合适的视频模型
+      const videoModel = customization.style === 'anime' ? 'wan2.1' : 'cogvideox';
+      
+      const response = await fetch('/api/modelslab/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: videoModel,
+          init_image: generatedImage,
+          prompt: `${prompt}, natural movement, breathing, gentle motion, sensual dance, body motion`,
+          negative_prompt: 'low quality, distorted, ugly, deformed, static, frozen',
+          width: 480,
+          height: 480,
+          num_frames: 81,
+          fps: 16,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('[Video] API Response:', data);
+      
+      if (data.status === 'success') {
+        const videoUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
+        if (videoUrl) {
+          console.log('[Video] ✅ Got video:', videoUrl);
+          setGeneratedVideo(videoUrl);
+          setVideoStatus('视频生成成功！');
+        } else {
+          console.error('[Video] ❌ Success but no video:', data);
+          alert('视频生成失败: 服务器返回成功但未提供视频');
+        }
+      } else if (data.status === 'error') {
+        const errorMsg = data.message || '未知错误';
+        console.error('[Video] ❌ API Error:', errorMsg);
+        alert('视频生成失败: ' + errorMsg);
+      } else {
+        console.error('[Video] ❌ Unknown response:', data);
+        alert('未知响应: ' + JSON.stringify(data).substring(0, 200));
+      }
+    } catch (error) {
+      console.error('Failed to generate video:', error);
+      alert('视频生成失败: ' + (error instanceof Error ? error.message : '网络错误'));
+    } finally {
+      setIsGeneratingVideo(false);
     }
   };
 
@@ -836,13 +902,32 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                   <h3 className="text-xl font-bold text-white">生成成功！</h3>
                 </div>
                 
+                {/* 图片预览 */}
                 <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 border-4 border-pink-500/30">
                   <img
                     src={generatedImage}
                     alt="Generated avatar"
                     className="w-full h-full object-cover"
                   />
+                  {generatedVideo && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <video
+                        src={generatedVideo}
+                        controls
+                        autoPlay
+                        loop
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
+                
+                {/* 视频状态 */}
+                {videoStatus && (
+                  <div className="text-center text-sm text-zinc-400">
+                    {videoStatus}
+                  </div>
+                )}
                 
                 <div className="flex gap-3">
                   <motion.button
@@ -854,6 +939,28 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
                     <RefreshCw className="w-4 h-4" />
                     重新生成
                   </motion.button>
+                  
+                  {/* 视频生成按钮 */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleGenerateVideo}
+                    disabled={isGeneratingVideo}
+                    className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-zinc-600 disabled:to-zinc-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isGeneratingVideo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>生成中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Video className="w-4 h-4" />
+                        <span>生成视频</span>
+                      </>
+                    )}
+                  </motion.button>
+                  
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

@@ -158,6 +158,84 @@ app.post('/api/modelslab/poll', async (req, res) => {
   }
 });
 
+// ModelsLab Video API代理 - 用于视频生成
+app.post('/api/modelslab/video', async (req, res) => {
+  const { model_id, prompt, negative_prompt, init_image, width, height, num_frames, fps, ...otherParams } = req.body;
+  const apiKey = process.env.MODELSLAB_API_KEY || process.env.VITE_MODELSLAB_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(400).json({ status: 'error', message: 'ModelsLab API key not configured' });
+  }
+  
+  if (!prompt || !model_id) {
+    return res.status(400).json({ status: 'error', message: 'model_id and prompt are required' });
+  }
+  
+  const isImg2Video = !!init_image;
+  const endpoint = isImg2Video 
+    ? 'https://modelslab.com/api/v6/video/img2video'
+    : 'https://modelslab.com/api/v6/video/text2video';
+  
+  console.log(`[${new Date().toISOString()}] ModelsLab Video request: model=${model_id}, type=${isImg2Video ? 'img2video' : 'text2video'}, prompt length=${prompt.length}`);
+  
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: apiKey,
+        model_id,
+        prompt,
+        negative_prompt: negative_prompt || 'low quality, distorted, ugly, deformed, static, frozen',
+        width: width || 480,
+        height: height || 480,
+        num_frames: num_frames || 81,
+        fps: fps || 16,
+        instant_response: true,
+        ...(init_image && { init_image }),
+        ...otherParams,
+      }),
+    });
+    
+    const data = await response.json();
+    console.log(`[${new Date().toISOString()}] ModelsLab Video response: status=${data.status}`);
+    
+    // 如果是异步处理，需要轮询
+    if (data.status === 'processing' && data.fetch_result) {
+      console.log(`[${new Date().toISOString()}] ModelsLab Video async processing, polling...`);
+      
+      const maxAttempts = 60;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 等待10秒
+        
+        const pollRes = await fetch(data.fetch_result, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: apiKey }),
+        });
+        
+        const pollData = await pollRes.json();
+        console.log(`[${new Date().toISOString()}] ModelsLab Video poll ${i + 1}/${maxAttempts}: status=${pollData.status}`);
+        
+        if (pollData.status === 'success') {
+          return res.json(pollData);
+        } else if (pollData.status === 'failed') {
+          return res.status(500).json({ status: 'error', message: 'Video generation failed' });
+        }
+      }
+      
+      return res.status(504).json({ status: 'error', message: 'Video generation timeout' });
+    }
+    
+    // 直接返回结果
+    res.json(data);
+    
+  } catch (error) {
+    console.error('ModelsLab Video proxy error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // X.AI Grok Imagine API代理
 app.post('/api/xai/image', async (req, res) => {
   const { prompt, model = 'grok-imagine-image' } = req.body;  // 正确的模型名称

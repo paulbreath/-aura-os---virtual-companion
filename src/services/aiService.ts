@@ -293,6 +293,7 @@ export interface Message {
   timestamp: Date;
   source?: 'direct' | 'telegram' | 'whatsapp';
   imageUrl?: string;
+  videoUrl?: string;
   audioData?: { data: string; mimeType: string };
   senderId?: string;
   senderName?: string;
