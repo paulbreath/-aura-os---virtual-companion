@@ -390,7 +390,7 @@ export function generateAvatarPrompt(customization: AvatarCustomization): string
 
 // 生成NSFW角色描述prompt
 export function generateNSFWAvatarPrompt(customization: AvatarCustomization): string {
-  const { face, body, personality, style, customPrompt, actions } = customization;
+  const { face, body, personality, style, customPrompt, actions, gender } = customization;
   
   // 风格前缀
   const stylePrefix = style === 'anime' 
@@ -406,18 +406,39 @@ export function generateNSFWAvatarPrompt(customization: AvatarCustomization): st
     face.makeup !== 'none' ? `${face.makeup} makeup` : '',
   ].filter(Boolean).join(', ');
   
-  const bodyDesc = [
-    `${body.bodyType} body`,
-    `${body.breastSize} breasts`,
-    `${body.waistSize} waist`,
-    `${body.hipSize} hips`,
-    `${body.buttSize} butt`,
-  ].filter(Boolean).join(', ');
+  // 性别相关的身体描述
+  const isMale = gender === 'male';
+  let bodyDesc: string;
+  
+  if (isMale) {
+    // 男性身体描述
+    bodyDesc = [
+      `${body.bodyType} body`,
+      'broad shoulders, muscular build, flat chest, no breasts',
+      `${body.waistSize} waist`,
+      `${body.hipSize} hips`,
+      `${body.buttSize} butt`,
+    ].filter(Boolean).join(', ');
+  } else {
+    // 女性身体描述
+    bodyDesc = [
+      `${body.bodyType} body`,
+      `${body.breastSize} breasts`,
+      `${body.waistSize} waist`,
+      `${body.hipSize} hips`,
+      `${body.buttSize} butt`,
+    ].filter(Boolean).join(', ');
+  }
   
   // 生成动作描述
   const actionDesc = generateActionPrompt(actions);
   
-  const basePrompt = `A beautiful naked ${customization.gender} named ${customization.name}, ${faceDesc}, ${bodyDesc}, completely nude, full body shot, showing all details, ${actionDesc}, erotic photography, soft lighting, intimate atmosphere, ${personality.type} personality, high quality, 8K`;
+  // 性别描述词 - 使用更强烈的性别描述
+  const genderDesc = isMale 
+    ? 'handsome young man, masculine, male body, XY chromosome'
+    : 'beautiful young woman, feminine, female body';
+  
+  const basePrompt = `A ${genderDesc} named ${customization.name}, ${faceDesc}, ${bodyDesc}, completely nude, full body shot, showing all details, ${actionDesc}, erotic photography, soft lighting, intimate atmosphere, ${personality.type} personality, high quality, 8K`;
   
   // 添加自定义描述
   const customDesc = customPrompt ? `, ${customPrompt}` : '';
