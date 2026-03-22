@@ -51,13 +51,24 @@ export const getAlbum = (avatarId: string): CharacterAlbum => {
 export const saveAlbum = (album: CharacterAlbum): void => {
   try {
     album.updatedAt = new Date();
-    localStorage.setItem(`aura-album-${album.avatarId}`, JSON.stringify(album));
+    
+    // 尝试保存
+    try {
+      localStorage.setItem(`aura-album-${album.avatarId}`, JSON.stringify(album));
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        console.warn('[Album] Storage quota exceeded, trimming album...');
+        // 清理旧图片，保留最新的5张
+        trimAlbum(album.avatarId, 5);
+        // 重新尝试保存
+        const trimmedAlbum = getAlbum(album.avatarId);
+        localStorage.setItem(`aura-album-${album.avatarId}`, JSON.stringify(trimmedAlbum));
+      } else {
+        throw e;
+      }
+    }
   } catch (e) {
     console.error('Failed to save album:', e);
-    // 如果存储空间不足，尝试清理旧图片
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      trimAlbum(album.avatarId, 10); // 保留最新的10张
-    }
   }
 };
 
@@ -75,10 +86,17 @@ export const addToAlbum = (
   try {
     const album = getAlbum(avatarId);
     
+    // 对于base64图片，如果太大会导致localStorage溢出
+    if (url.startsWith('data:') && url.length > 100000) {
+      console.warn('[Album] Large base64 image, skipping storage to save space');
+      // 对于过大的base64图片，不存储到相册
+      return null;
+    }
+    
     const newImage: AlbumImage = {
       id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       url,
-      prompt: options.prompt,
+      prompt: options.prompt?.substring(0, 200), // 限制prompt长度
       model: options.model,
       type: options.type || 'selfie',
       createdAt: new Date(),
@@ -88,9 +106,9 @@ export const addToAlbum = (
     // 添加到开头（最新的在前）
     album.images.unshift(newImage);
     
-    // 限制相册大小（最多50张）
-    if (album.images.length > 50) {
-      album.images = album.images.slice(0, 50);
+    // 限制相册大小（最多30张，减少以节省空间）
+    if (album.images.length > 30) {
+      album.images = album.images.slice(0, 30);
     }
     
     saveAlbum(album);

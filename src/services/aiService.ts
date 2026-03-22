@@ -1614,9 +1614,16 @@ export const generateSelfie = async (
   
   console.log(`[Selfie] Style: ${isAnime ? 'anime' : 'realistic'}, Prompt: ${finalPrompt.substring(0, 100)}...`);
   
-  // Primary: X.AI Grok 2 Image (direct API call)
+  // 检测是否为NSFW请求 - 如果是，直接使用ModelsLab跳过X.AI（X.AI会过滤NSFW内容）
+  const isNSFWRequest = userRequest && userRequest.toLowerCase().match(/porn|nude|naked|sex|裸|性|fuck|masturbat|69|clit|dick|pussy|hentai|erotic|成人|裸体|自慰|口交/i);
+  
+  if (isNSFWRequest) {
+    console.log('[Selfie] 🔞 NSFW request detected, skipping X.AI (content filter), using ModelsLab directly');
+  }
+  
+  // Primary: X.AI Grok 2 Image (direct API call) - 仅用于非NSFW请求
   const xaiKey = import.meta.env.VITE_XAI_API_KEY;
-  if (xaiKey) {
+  if (xaiKey && !isNSFWRequest) {
     try {
        console.log('Trying X.AI Grok 2 Image directly...');
       
