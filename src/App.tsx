@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, generateSelfie, generateSpeech, setPreferredModel, getPreferredModel, AVAILABLE_MODELS, ModelConfig, MINIMAX_TTS_VOICES } from './services/aiService';
-import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext } from './services/memoryService';
+import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext, saveSelfiePreference } from './services/memoryService';
 import { live2dService } from './services/live2dService';
 import { addToAlbum } from './types/album';
 import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus, GalleryHorizontal } from 'lucide-react';
@@ -438,7 +438,7 @@ export default function App() {
 
       try {
         const recentContext = messages.slice(-6).map(m => `${m.senderName || m.role}: ${m.content}`).join('\n');
-        const imageUrl = await generateSelfie(currentAvatar, recentContext, userPrompt, chatMode === 'group', chatMode === 'group' ? groupMembers : []);
+        const imageUrl = await generateSelfie(currentAvatar, recentContext, userPrompt, chatMode === 'group', chatMode === 'group' ? groupMembers : [], userMemory);
 
         if (imageUrl) {
           // 保存到角色相册
@@ -449,6 +449,17 @@ export default function App() {
               scene: recentContext.slice(-100)
             }
           });
+          
+          // 保存到用户审美偏好记忆
+          if (userPrompt) {
+            const isAnime = currentAvatar.imageStyle === 'anime';
+            const updatedMemory = saveSelfiePreference(
+              userMemory,
+              userPrompt,
+              isAnime ? 'anime' : 'realistic'
+            );
+            setUserMemory(updatedMemory);
+          }
           
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),

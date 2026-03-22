@@ -1458,12 +1458,15 @@ const applyGrokNSFWBypass = (prompt: string, userRequest?: string): string => {
   return bypassPrompt;
 };
 
+import { UserMemory, getBestSelfiePrompt } from './memoryService';
+
 export const generateSelfie = async (
   avatar: Avatar,
   context: string,
   userRequest?: string,
   isGroup: boolean = false,
-  groupMembers: Avatar[] = []
+  groupMembers: Avatar[] = [],
+  userMemory?: UserMemory  // 新增：用户记忆
 ): Promise<string | null> => {
   // Analyze context to determine scene/environment/mood
   const contextLower = context.toLowerCase();
@@ -1530,6 +1533,20 @@ export const generateSelfie = async (
   const isAnime = avatar.imageStyle === 'anime';
   console.log(`[Selfie] Character: ${avatar.name}, imageStyle: ${avatar.imageStyle}, isAnime: ${isAnime}`);
   
+  // 检查是否有用户历史偏好
+  let historicalPrompt: string | null = null;
+  if (userMemory && !userRequest) {
+    // 用户没有提供明确提示词，尝试使用历史偏好
+    historicalPrompt = getBestSelfiePrompt(
+      userMemory, 
+      isAnime ? 'anime' : 'realistic',
+      undefined
+    );
+    if (historicalPrompt) {
+      console.log(`[Selfie] Using historical preference: ${historicalPrompt.substring(0, 50)}...`);
+    }
+  }
+  
   // 根据风格添加前缀
   const stylePrefix = isAnime 
     ? 'anime style, anime art, 2D anime, detailed anime illustration of' 
@@ -1570,9 +1587,16 @@ export const generateSelfie = async (
   // 添加mood
   enhancedPrompt += `${mood}, `;
   
-  // 添加用户请求
+  // 添加用户请求或历史偏好
   if (userRequest) {
+    // 用户有明确请求，使用用户的请求
     enhancedPrompt += `${userRequest}, `;
+  } else if (historicalPrompt) {
+    // 使用历史偏好中的关键词（排除重复的风格前缀）
+    const cleanHistorical = historicalPrompt.replace(/^(anime style|photorealistic).*?of\s*/i, '').trim();
+    if (cleanHistorical.length > 0) {
+      enhancedPrompt += `user's preferred style: ${cleanHistorical}, `;
+    }
   }
   
   // 风格特定的结尾
