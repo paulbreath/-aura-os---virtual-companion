@@ -2103,7 +2103,7 @@ export const generateSpeech = async (
   return null;
 };
 
-// Generate video using FAL.AI (e.g., for avatar video messages)
+// Generate video using ModelsLab API
 export const generateVideo = async (
   avatar: Avatar,
   context: string,
@@ -2131,6 +2131,37 @@ export const generateVideo = async (
     } catch (error) {
       console.error('SpicyAPI video generation failed:', error);
     }
+  }
+
+  // Fallback: ModelsLab via our server proxy
+  try {
+    console.log('🎬 Trying ModelsLab for video generation...');
+    const response = await fetch('/api/modelslab/video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model_id: 'wan2.1',
+        prompt: prompt,
+        negative_prompt: 'low quality, distorted, ugly, deformed, static, frozen',
+        width: 480,
+        height: 480,
+        num_frames: 81,
+        fps: 16,
+      }),
+    });
+    
+    const data = await response.json();
+    console.log('[ModelsLab Video] Response:', data.status);
+    
+    if (data.status === 'success') {
+      const videoUrl = data.output?.[0] || data.future_links?.[0] || data.web_links?.[0];
+      if (videoUrl) {
+        console.log('✅ ModelsLab video generated:', videoUrl);
+        return videoUrl;
+      }
+    }
+  } catch (error) {
+    console.error('ModelsLab video generation failed:', error);
   }
 
   // Fallback: FAL
