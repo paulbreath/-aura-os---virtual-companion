@@ -3,12 +3,13 @@ import { Message, Avatar, AVATARS, generateResponse, generateAutonomousAction, g
 import { UserMemory, loadUserMemory, saveUserMemory, addMemory, getRelevantMemories, generateMemoryContext, saveSelfiePreference } from './services/memoryService';
 import { live2dService } from './services/live2dService';
 import { addToAlbum } from './types/album';
-import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus, GalleryHorizontal } from 'lucide-react';
+import { Heart, Briefcase, MessageCircle, Phone, Settings, Send, Bot, Smartphone, Zap, Camera, Image as ImageIcon, Users, Volume2, VolumeX, PlayCircle, MessageSquare, ChevronDown, X, Mic, Pause, Plus, GalleryHorizontal, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AvatarCreator from './components/AvatarCreator';
 import Live2DCharacter from './components/Live2DCharacter';
 import VoiceChat from './components/VoiceChat';
 import CharacterAlbum from './components/CharacterAlbum';
+import SceneSelector from './components/SceneSelector';
 
 export default function App() {
   const [startTime] = useState(Date.now());
@@ -47,6 +48,7 @@ export default function App() {
   const [selfieMode, setSelfieMode] = useState(false);
   const [showAvatarCreator, setShowAvatarCreator] = useState(false);
   const [showAlbum, setShowAlbum] = useState(false);
+  const [showSceneSelector, setShowSceneSelector] = useState(false);
   const [chatBackground, setChatBackground] = useState<string | null>(() => {
     return localStorage.getItem('aura-chat-background') || null;
   });
@@ -508,7 +510,7 @@ export default function App() {
           response = `📊 **系统状态**\n\n- **AI模型**: Grok 4.1 Fast\n- **Live2D**: ${showLive2D ? '已启用 ✅' : '已禁用'}\n- **语音模式**: ${voiceMode ? '已启用 ✅' : '已禁用'}\n- **聊天模式**: ${chatMode === 'solo' ? '单人' : '群聊'}\n- **运行时间**: ${mins}分${secs}秒\n- **消息数量**: ${messages.length}`;
           break;
         case '/help':
-          response = `📖 **可用命令**\n\n- \`/model\` - 查看当前AI模型\n- \`/status\` - 查看系统状态\n- \`/clear\` - 清除聊天记录\n- \`/memory\` - 查看用户记忆\n- \`/video\` - 生成角色视频\n- \`/help\` - 显示帮助信息`;
+          response = `📖 **可用命令**\n\n- \`/model\` - 查看当前AI模型\n- \`/status\` - 查看系统状态\n- \`/clear\` - 清除聊天记录\n- \`/memory\` - 查看用户记忆\n- \`/video\` - 生成角色视频\n- \`/scene\` - 场景图片生成\n- \`/help\` - 显示帮助信息`;
           break;
         case '/clear':
           setMessages([{
@@ -527,6 +529,10 @@ export default function App() {
           const prefs = Object.keys(userMemory.preferences || {}).length;
           response = `🧠 **用户记忆**\n\n- **记忆条数**: ${memCount}\n- **偏好设置**: ${prefs}\n\n记忆帮助我更好地了解你～`;
           break;
+        case '/scene':
+          setShowSceneSelector(true);
+          setInput('');
+          return;
         case '/video':
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
@@ -1715,6 +1721,17 @@ export default function App() {
         isOpen={showAlbum}
         onClose={() => setShowAlbum(false)}
       />
+
+      {/* Scene Selector */}
+      <AnimatePresence>
+        {showSceneSelector && (
+          <SceneSelector
+            characterId={currentAvatar.id}
+            characterName={currentAvatar.name}
+            onClose={() => setShowSceneSelector(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Video Player Modal */}
       <AnimatePresence>

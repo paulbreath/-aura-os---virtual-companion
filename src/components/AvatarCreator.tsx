@@ -28,6 +28,7 @@ import {
   generateAvatarPrompt,
   generateNSFWAvatarPrompt,
 } from '../types/avatarCustomization';
+import { createDNAFromAvatar, saveCharacterDNA, generateDNAPrompt, SCENE_TEMPLATES, SceneTemplate, CATEGORY_COLORS, CATEGORY_NAMES } from '../types/characterDNA';
 
 interface AvatarCreatorProps {
   onComplete: (customization: AvatarCustomization, avatarUrl: string, backgroundUrl: string) => void;
@@ -231,8 +232,40 @@ export default function AvatarCreator({ onComplete, onCancel }: AvatarCreatorPro
 
   const handleComplete = () => {
     if (generatedImage) {
+      // 创建角色ID
+      const characterId = `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 生成面部描述 (用于后续图片生成保持一致性)
+      const faceDescription = [
+        customization.face.hairColor,
+        customization.face.hairStyle,
+        customization.face.eyeColor,
+        customization.face.skinTone,
+        customization.face.shape,
+        'face'
+      ].join(' ');
+      
+      // 生成身体描述
+      const bodyDescription = [
+        customization.body.bodyType,
+        customization.body.breastSize !== 'none' ? customization.body.breastSize + ' breasts' : '',
+        customization.body.buttSize + ' butt',
+        customization.body.skinTexture
+      ].filter(Boolean).join(', ');
+      
+      // 创建并保存 CharacterDNA
+      const dna = createDNAFromAvatar(
+        characterId,
+        generatedImage,
+        faceDescription,
+        bodyDescription,
+        customization.style,
+        selectedModel
+      );
+      saveCharacterDNA(dna);
+      console.log('✅ Character DNA saved:', characterId);
+      
       // 使用同一个图片作为头像和背景
-      // 背景可以用图片本身，头像也用同一个
       onComplete(customization, generatedImage, generatedImage);
     }
   };
